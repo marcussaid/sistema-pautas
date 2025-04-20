@@ -347,48 +347,56 @@ def forgot_password():
 @app.route('/admin')
 @login_required
 def admin():
-    if not current_user.is_superuser:
-        flash('Acesso negado: você não tem permissão para acessar essa página.')
-        return redirect(url_for('form'))
+    try:
+        if not current_user.is_superuser:
+            flash('Acesso negado: você não tem permissão para acessar essa página.')
+            return redirect(url_for('form'))
+            
+        users = query_db('SELECT * FROM users ORDER BY username')
         
-    users = query_db('SELECT * FROM users ORDER BY username')
-    
-    # Obtém estatísticas atualizadas do banco de dados
-    stats = get_stats()
-    stats['total_usuarios'] = len(users)
-    
-    # Busca os logs mais recentes do sistema
-    system_logs = query_db('''
-        SELECT timestamp, username, action, details, ip_address 
-        FROM system_logs 
-        ORDER BY timestamp DESC 
-        LIMIT 50
-    ''')
-    
-    # Formata os logs para exibição
-    formatted_logs = []
-    for log in system_logs:
-        timestamp = log['timestamp']
-        # Formata a data/hora para exibição
-        if isinstance(timestamp, str):
-            # Analisa a string de data/hora
-            try:
-                from datetime import datetime
-                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-            except:
-                # Mantém como string se não conseguir converter
-                pass
+        # Obtém estatísticas atualizadas do banco de dados
+        stats = get_stats()
+        stats['total_usuarios'] = len(users)
         
-        formatted_log = f"[{timestamp}] {log['username']}: {log['action']} - {log['details']}"
-        formatted_logs.append(formatted_log)
-    
-    settings = {
-        'per_page': 10,
-        'session_timeout': 60,
-        'auto_backup': 'daily'
-    }
-    
-    return render_template('admin.html', users=users, stats=stats, system_logs=formatted_logs, settings=settings)
+        # Busca os logs mais recentes do sistema
+        system_logs = query_db('''
+            SELECT timestamp, username, action, details, ip_address 
+            FROM system_logs 
+            ORDER BY timestamp DESC 
+            LIMIT 50
+        ''')
+        
+        # Formata os logs para exibição
+        formatted_logs = []
+        for log in system_logs:
+            timestamp = log['timestamp']
+            # Formata a data/hora para exibição
+            if isinstance(timestamp, str):
+                # Analisa a string de data/hora
+                try:
+                    from datetime import datetime
+                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                except:
+                    # Mantém como string se não conseguir converter
+                    pass
+            
+            formatted_log = f"[{timestamp}] {log['username']}: {log['action']} - {log['details']}"
+            formatted_logs.append(formatted_log)
+        
+        settings = {
+            'per_page': 10,
+            'session_timeout': 60,
+            'auto_backup': 'daily'
+        }
+        
+        return render_template('admin.html', users=users, stats=stats, system_logs=formatted_logs, settings=settings)
+    except Exception as e:
+        import traceback
+        error_message = f"Erro interno na página de administração: {str(e)}"
+        print(error_message)
+        print(traceback.format_exc())
+        flash(error_message)
+        return redirect(url_for('index'))
 
 @app.route('/admin/user/<int:user_id>', methods=['PUT'])
 @login_required
