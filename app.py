@@ -1228,6 +1228,27 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+from flask import jsonify
+
+@app.route('/debug/system_logs_columns')
+def system_logs_columns():
+    try:
+        if IS_PRODUCTION:
+            query = """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'system_logs'
+            """
+            columns = query_db(query)
+        else:
+            # SQLite
+            query = "PRAGMA table_info(system_logs)"
+            result = query_db(query)
+            columns = [row['name'] for row in result]
+        return jsonify({'columns': columns})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Garantir que as tabelas do banco de dados existam
     ensure_tables()
