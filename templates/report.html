@@ -940,6 +940,7 @@ function aplicarFiltrosAvancados() {
     
     // Registra na console para debug
     console.log('Termo de pesquisa normalizado:', termo);
+    console.log('Local sendo buscado:', termo.includes('auditorio'), termo.includes('smec'));
     
     // Obtém todas as linhas da tabela
     const rows = document.querySelectorAll('[data-demanda-row]');
@@ -954,6 +955,11 @@ function aplicarFiltrosAvancados() {
         const rowData = row.getAttribute('data-data');
         const direcionamentos = normalizarTexto(row.getAttribute('data-direcionamentos'));
         const local = normalizarTexto(row.dataset.local || '');
+        
+        // Debug para o campo Local
+        if (local.includes('auditorio') || local.includes('smec')) {
+            console.log('Encontrado local com Auditório - SMEC:', local);
+        }
         
         // Verifica se a linha atende a todos os critérios de filtro
         let match = true;
