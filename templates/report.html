@@ -53,17 +53,17 @@
             </div>
             
             <div id="searchContainer" class="hidden">
-                <form action="{{ url_for('search') }}" method="post" class="mt-3">
+                <form id="advancedSearchForm" class="mt-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="termo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 transition-colors duration-200">Termo de Pesquisa</label>
-                            <input type="text" id="termo" name="termo" 
+                            <input type="text" id="termoAvancado" name="termo" 
                                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200"
                                 placeholder="Pesquisar por demanda, assunto, local...">
                         </div>
                         <div>
-                            <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 transition-colors duration-200">Status</label>
-                            <select id="status" name="status" 
+                            <label for="statusAvancado" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 transition-colors duration-200">Status</label>
+                            <select id="statusAvancado" name="status" 
                                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors duration-200">
                                 <option value="">Todos</option>
                                 {% for status in status_list %}
@@ -83,7 +83,10 @@
                         </div>
                     </div>
                     <div class="mt-4 flex justify-end">
-                        <button type="submit" 
+                        <button type="button" id="limparFiltros" class="bg-gray-500 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-500 text-white font-bold py-2 px-4 rounded mr-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
+                            <i class="fas fa-eraser mr-2"></i>Limpar
+                        </button>
+                        <button type="button" id="aplicarFiltrosAvancados" 
                                 class="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
                             <i class="fas fa-search mr-2"></i>Pesquisar
                         </button>
@@ -442,9 +445,40 @@ function closeColumnsModal() {
     }, 200);
 }
 
-// Pesquisa em tempo real na tabela
+// Toggle formulário de pesquisa avançada
+document.getElementById('toggleSearch').addEventListener('click', function() {
+    const container = document.getElementById('searchContainer');
+    const icon = document.getElementById('searchIcon');
+    
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+    } else {
+        container.classList.add('hidden');
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+    }
+});
+
+// Adiciona suporte à tecla Enter no formulário de pesquisa avançada
+document.getElementById('advancedSearchForm').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault(); // Evita o envio padrão do formulário
+        aplicarFiltrosAvancados();
+    }
+});
+
+// Integra a pesquisa simples com a avançada para que o valor seja compartilhado
 document.getElementById('searchInput').addEventListener('input', function(e) {
     const searchValue = e.target.value.toLowerCase();
+    
+    // Se o campo de pesquisa avançada estiver visível, atualize-o também
+    if (!document.getElementById('searchContainer').classList.contains('hidden')) {
+        document.getElementById('termoAvancado').value = searchValue;
+    }
+    
+    // Continua com a lógica existente de filtragem em tempo real
     const rows = document.querySelectorAll('[data-demanda-row]');
     
     let visibleCount = 0;
@@ -486,22 +520,6 @@ document.getElementById('statusFilter').addEventListener('change', function(e) {
     
     // Atualiza o contador
     document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
-});
-
-// Toggle formulário de pesquisa avançada
-document.getElementById('toggleSearch').addEventListener('click', function() {
-    const container = document.getElementById('searchContainer');
-    const icon = document.getElementById('searchIcon');
-    
-    if (container.classList.contains('hidden')) {
-        container.classList.remove('hidden');
-        icon.classList.remove('fa-chevron-down');
-        icon.classList.add('fa-chevron-up');
-    } else {
-        container.classList.add('hidden');
-        icon.classList.remove('fa-chevron-up');
-        icon.classList.add('fa-chevron-down');
-    }
 });
 
 // Ordenação da tabela
@@ -847,6 +865,103 @@ function printModalDetails() {
         // Opcionalmente, feche a janela após imprimir
         // printWindow.onafterprint = function() { printWindow.close(); };
     };
+}
+
+// Pesquisa avançada na tabela
+document.getElementById('aplicarFiltrosAvancados').addEventListener('click', function() {
+    aplicarFiltrosAvancados();
+});
+
+document.getElementById('limparFiltros').addEventListener('click', function() {
+    // Limpa os campos do formulário
+    document.getElementById('termoAvancado').value = '';
+    document.getElementById('statusAvancado').value = '';
+    document.getElementById('data_inicio').value = '';
+    document.getElementById('data_fim').value = '';
+    
+    // Mostra todas as linhas
+    const rows = document.querySelectorAll('[data-demanda-row]');
+    rows.forEach(row => {
+        row.style.display = '';
+    });
+    
+    // Atualiza o contador
+    document.getElementById('registrosCounter').textContent = `Mostrando ${rows.length} registro(s)`;
+});
+
+function aplicarFiltrosAvancados() {
+    // Obtém os valores dos filtros
+    const termo = document.getElementById('termoAvancado').value.toLowerCase();
+    const status = document.getElementById('statusAvancado').value.toLowerCase();
+    const dataInicio = document.getElementById('data_inicio').value;
+    const dataFim = document.getElementById('data_fim').value;
+    
+    // Obtém todas as linhas da tabela
+    const rows = document.querySelectorAll('[data-demanda-row]');
+    
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        // Obtém os dados da linha
+        const demanda = row.getAttribute('data-demanda').toLowerCase();
+        const assunto = row.getAttribute('data-assunto').toLowerCase();
+        const rowStatus = row.getAttribute('data-status').toLowerCase();
+        const rowData = row.getAttribute('data-data');
+        const direcionamentos = row.getAttribute('data-direcionamentos').toLowerCase();
+        const local = row.dataset.local ? row.dataset.local.toLowerCase() : '';
+        
+        // Verifica se a linha atende a todos os critérios de filtro
+        let match = true;
+        
+        // Filtra por termo (demanda, assunto, local ou direcionamentos)
+        if (termo) {
+            match = match && (
+                demanda.includes(termo) ||
+                assunto.includes(termo) ||
+                local.includes(termo) ||
+                direcionamentos.includes(termo)
+            );
+        }
+        
+        // Filtra por status
+        if (status) {
+            match = match && (rowStatus === status);
+        }
+        
+        // Filtra por data de início
+        if (dataInicio) {
+            match = match && (rowData >= dataInicio);
+        }
+        
+        // Filtra por data de fim
+        if (dataFim) {
+            match = match && (rowData <= dataFim);
+        }
+        
+        // Exibe ou oculta a linha com base no resultado do filtro
+        if (match) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Atualiza o contador
+    document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
+    
+    // Fecha o painel de pesquisa avançada após pesquisar
+    if (visibleCount > 0) {
+        // Adiciona uma mensagem de filtro aplicado
+        const statusText = status ? `Status: ${status.charAt(0).toUpperCase() + status.slice(1)}` : '';
+        const dataText = (dataInicio || dataFim) ? `Período: ${dataInicio || 'início'} a ${dataFim || 'atual'}` : '';
+        const termoText = termo ? `Termo: "${termo}"` : '';
+        
+        const filtros = [termoText, statusText, dataText].filter(f => f).join(' | ');
+        if (filtros) {
+            document.getElementById('registrosCounter').textContent += ` (Filtros: ${filtros})`;
+        }
+    }
 }
 </script>
 {% endblock %}
