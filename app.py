@@ -358,30 +358,69 @@ def admin():
         stats = get_stats()
         stats['total_usuarios'] = len(users)
         
-        # Busca os logs mais recentes do sistema
-        system_logs = query_db('''
-            SELECT timestamp, username, action, details, ip_address 
-            FROM system_logs 
-            ORDER BY timestamp DESC 
-            LIMIT 50
-        ''')
+        # Busca os logs mais recentes do sistema - versão segura
+        try:
+            # Verifica se todas as colunas existem antes de fazer a consulta
+            if IS_PRODUCTION:
+                # PostgreSQL
+                columns_query = """
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'system_logs'
+                """
+                columns = [col['column_name'] for col in query_db(columns_query)]
+                
+                # Verifica se todas as colunas necessárias existem
+                required_columns = ['timestamp', 'username', 'action', 'details', 'ip_address']
+                missing_columns = [col for col in required_columns if col not in columns]
+                
+                if missing_columns:
+                    # Se faltam colunas, não faz a consulta
+                    system_logs = []
+                    flash(f"Algumas colunas estão faltando na tabela system_logs: {', '.join(missing_columns)}. Execute a migração.")
+                else:
+                    # Se todas as colunas existem, faz a consulta normal
+                    system_logs = query_db('''
+                        SELECT timestamp, username, action, details, ip_address 
+                        FROM system_logs 
+                        ORDER BY timestamp DESC 
+                        LIMIT 50
+                    ''')
+            else:
+                # No ambiente de desenvolvimento, assume que a estrutura está correta
+                system_logs = query_db('''
+                    SELECT timestamp, username, action, details, ip_address 
+                    FROM system_logs 
+                    ORDER BY timestamp DESC 
+                    LIMIT 50
+                ''')
+        except Exception as e:
+            system_logs = []
+            flash(f"Erro ao buscar logs do sistema: {str(e)}")
+            print(f"Erro ao buscar logs do sistema: {str(e)}")
         
         # Formata os logs para exibição
         formatted_logs = []
         for log in system_logs:
-            timestamp = log['timestamp']
-            # Formata a data/hora para exibição
-            if isinstance(timestamp, str):
-                # Analisa a string de data/hora
-                try:
-                    from datetime import datetime
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                except:
-                    # Mantém como string se não conseguir converter
-                    pass
-            
-            formatted_log = f"[{timestamp}] {log['username']}: {log['action']} - {log['details']}"
-            formatted_logs.append(formatted_log)
+            try:
+                timestamp = log.get('timestamp', 'N/A')
+                username = log.get('username', 'N/A')
+                action = log.get('action', 'N/A')
+                details = log.get('details', 'N/A')
+                
+                # Formata a data/hora para exibição
+                if isinstance(timestamp, str):
+                    # Analisa a string de data/hora
+                    try:
+                        from datetime import datetime
+                        timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    except:
+                        # Mantém como string se não conseguir converter
+                        pass
+                
+                formatted_log = f"[{timestamp}] {username}: {action} - {details}"
+                formatted_logs.append(formatted_log)
+            except Exception as log_error:
+                formatted_logs.append(f"[Erro ao formatar log] {str(log_error)}")
         
         settings = {
             'per_page': 10,
@@ -1274,6 +1313,64 @@ def run_migration():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/debug/table_info')
+@login_required
+def table_info():
+    try:
+        if not current_user.is_superuser:
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        result = {}
+        
+        if IS_PRODUCTION:
+            # PostgreSQL
+            # Verifica a tabela system_logs
+            query_sl = """
+                SELECT column_name, data_type, character_maximum_length
+                FROM information_schema.columns
+                WHERE table_name = 'system_logs'
+                ORDER BY ordinal_position
+            """
+            system_logs_columns = query_db(query_sl)
+            
+            # Verifica a tabela registros
+            query_reg = """
+                SELECT column_name, data_type, character_maximum_length
+                FROM information_schema.columns
+                WHERE table_name = 'registros'
+                ORDER BY ordinal_position
+            """
+            registros_columns = query_db(query_reg)
+            
+            # Conteúdo da tabela system_logs
+            log_entries = query_db("SELECT * FROM system_logs LIMIT 5")
+            
+        else:
+            # SQLite
+            # Verifica a tabela system_logs
+            system_logs_columns = query_db("PRAGMA table_info(system_logs)")
+            
+            # Verifica a tabela registros
+            registros_columns = query_db("PRAGMA table_info(registros)")
+            
+            # Conteúdo da tabela system_logs
+            log_entries = query_db("SELECT * FROM system_logs LIMIT 5")
+        
+        result = {
+            'system_logs_columns': system_logs_columns,
+            'registros_columns': registros_columns,
+            'log_entries': log_entries
+        }
+        
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        error = {
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+        return jsonify(error), 500
 
 if __name__ == '__main__':
     # Garantir que as tabelas do banco de dados existam
