@@ -1249,6 +1249,32 @@ def system_logs_columns():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug/run_migration')
+@login_required
+def run_migration():
+    try:
+        if not current_user.is_superuser:
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        # Lê o arquivo de migração
+        with open('migration.sql', 'r') as f:
+            migration_sql = f.read()
+
+        # Executa o SQL de migração
+        if IS_PRODUCTION:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute(migration_sql)
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({'message': 'Migração executada com sucesso'})
+        else:
+            return jsonify({'message': 'Migração só pode ser executada em produção'})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Garantir que as tabelas do banco de dados existam
     ensure_tables()
