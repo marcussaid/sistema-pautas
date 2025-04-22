@@ -920,12 +920,15 @@ document.getElementById('limparFiltros').addEventListener('click', function() {
     
     // Mostra todas as linhas
     const rows = document.querySelectorAll('[data-demanda-row]');
+    let visibleCount = 0;
+    
     rows.forEach(row => {
         row.style.display = '';
+        visibleCount++;
     });
     
     // Atualiza o contador
-    document.getElementById('registrosCounter').textContent = `Mostrando ${rows.length} registro(s)`;
+    document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
 });
 
 function aplicarFiltrosAvancados() {
