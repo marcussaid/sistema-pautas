@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+﻿﻿{% extends 'base.html' %}
 {% block content %}
 <div class="container mx-auto px-2 py-4 bg-gray-50 dark:bg-gray-900 min-h-screen transition-all duration-200">
     <div class="mb-8 flex flex-col sm:flex-row justify-between items-center">
@@ -525,20 +525,6 @@ columnToggles.forEach(column => {
     });
 });
 
-// Controle de altura da tabela
-document.getElementById('increaseHeight').addEventListener('click', function() {
-    const tableContainer = document.querySelector('.overflow-x-auto');
-    const currentHeight = parseInt(tableContainer.style.maxHeight) || 70;
-    const newHeight = Math.min(currentHeight + 10, 90); // Limita a 90vh
-    tableContainer.style.maxHeight = `${newHeight}vh`;
-});
-
-document.getElementById('decreaseHeight').addEventListener('click', function() {
-    const tableContainer = document.querySelector('.overflow-x-auto');
-    const currentHeight = parseInt(tableContainer.style.maxHeight) || 70;
-    const newHeight = Math.max(currentHeight - 10, 30); // Não permite ficar menor que 30vh
-    tableContainer.style.maxHeight = `${newHeight}vh`;
-});
 
 // Atualiza o link de exportação com os filtros aplicados
 function updateExportLink() {
