@@ -233,9 +233,14 @@
         <div class="p-6">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200" id="modalTitle"></h2>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button onclick="printModalDetails()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200" title="Imprimir detalhes">
+                        <i class="fas fa-print text-xl"></i>
+                    </button>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
             </div>
             <div class="space-y-4">
                 <div>
@@ -266,6 +271,9 @@
         </div>
     </div>
 </div>
+
+<!-- Conteúdo para impressão (invisível na página) -->
+<div id="printContent" style="display: none;"></div>
 
 <!-- Modal de Colunas -->
 <div id="columnsModal" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 hidden transition-opacity duration-200">
@@ -698,6 +706,147 @@ function updateRecordCounter() {
     if (counter) {
         counter.textContent = `Mostrando ${visibleRows.length} registro(s)`;
     }
+}
+
+// Função para imprimir os detalhes do modal
+function printModalDetails() {
+    // Obtém os dados do modal
+    const titulo = document.getElementById('modalTitle').textContent;
+    const data = document.getElementById('modalData').textContent;
+    const assunto = document.getElementById('modalAssunto').textContent;
+    const local = document.getElementById('modalLocal').textContent;
+    const direcionamentos = document.getElementById('modalDirecionamentos').textContent;
+    const status = document.getElementById('modalStatus').textContent;
+    const ultimaEdicao = document.getElementById('modalUltimaEdicao').textContent;
+    
+    // Cria o conteúdo HTML para impressão
+    const printableContent = `
+        <html>
+        <head>
+            <title>Detalhes da Demanda: ${titulo}</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                h1 {
+                    font-size: 24px;
+                    border-bottom: 1px solid #ddd;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                }
+                .info-section {
+                    margin-bottom: 15px;
+                }
+                .info-label {
+                    font-weight: bold;
+                    color: #555;
+                    margin-bottom: 5px;
+                }
+                .info-value {
+                    margin-left: 20px;
+                }
+                .status {
+                    display: inline-block;
+                    padding: 3px 10px;
+                    border-radius: 15px;
+                    font-weight: bold;
+                }
+                .status-pendente {
+                    background-color: #FEF3C7;
+                    color: #92400E;
+                    border: 1px solid #F59E0B;
+                }
+                .status-concluido {
+                    background-color: #D1FAE5;
+                    color: #065F46;
+                    border: 1px solid #10B981;
+                }
+                .status-andamento {
+                    background-color: #DBEAFE;
+                    color: #1E40AF;
+                    border: 1px solid #3B82F6;
+                }
+                .status-cancelado {
+                    background-color: #FEE2E2;
+                    color: #B91C1C;
+                    border: 1px solid #EF4444;
+                }
+                .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #6B7280;
+                    border-top: 1px solid #ddd;
+                    padding-top: 10px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Detalhes da Demanda</h1>
+            
+            <div class="info-section">
+                <div class="info-label">Demanda:</div>
+                <div class="info-value">${titulo}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Data:</div>
+                <div class="info-value">${data}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Assunto:</div>
+                <div class="info-value">${assunto}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Local:</div>
+                <div class="info-value">${local}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Direcionamentos:</div>
+                <div class="info-value">${direcionamentos}</div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Status:</div>
+                <div class="info-value">
+                    <span class="status ${status === 'Pendente' ? 'status-pendente' : 
+                                          status === 'Concluído' ? 'status-concluido' : 
+                                          status === 'Em andamento' ? 'status-andamento' : 
+                                          'status-cancelado'}">${status}</span>
+                </div>
+            </div>
+            
+            <div class="info-section">
+                <div class="info-label">Última Edição:</div>
+                <div class="info-value">${ultimaEdicao}</div>
+            </div>
+            
+            <div class="footer">
+                Impresso em: ${new Date().toLocaleString()}
+            </div>
+        </body>
+        </html>
+    `;
+    
+    // Cria uma nova janela para impressão
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printableContent);
+    printWindow.document.close();
+    
+    // Espera o conteúdo carregar e então imprime
+    printWindow.onload = function() {
+        printWindow.print();
+        // Opcionalmente, feche a janela após imprimir
+        // printWindow.onafterprint = function() { printWindow.close(); };
+    };
 }
 </script>
 {% endblock %}
