@@ -358,41 +358,15 @@ def admin():
         stats = get_stats()
         stats['total_usuarios'] = len(users)
         
-        # Busca os logs mais recentes do sistema - versão segura
+        # Busca os logs mais recentes do sistema - versão compatível
         try:
-            # Verifica se todas as colunas existem antes de fazer a consulta
-            if IS_PRODUCTION:
-                # PostgreSQL
-                columns_query = """
-                    SELECT column_name FROM information_schema.columns 
-                    WHERE table_name = 'system_logs'
-                """
-                columns = [col['column_name'] for col in query_db(columns_query)]
-                
-                # Verifica se todas as colunas necessárias existem
-                required_columns = ['timestamp', 'username', 'action', 'details', 'ip_address']
-                missing_columns = [col for col in required_columns if col not in columns]
-                
-                if missing_columns:
-                    # Se faltam colunas, não faz a consulta
-                    system_logs = []
-                    flash(f"Algumas colunas estão faltando na tabela system_logs: {', '.join(missing_columns)}. Execute a migração.")
-                else:
-                    # Se todas as colunas existem, faz a consulta normal
-                    system_logs = query_db('''
-                        SELECT timestamp, username, action, details, ip_address 
-                        FROM system_logs 
-                        ORDER BY timestamp DESC 
-                        LIMIT 50
-                    ''')
-            else:
-                # No ambiente de desenvolvimento, assume que a estrutura está correta
-                system_logs = query_db('''
-                    SELECT timestamp, username, action, details, ip_address 
-                    FROM system_logs 
-                    ORDER BY timestamp DESC 
-                    LIMIT 50
-                ''')
+            # Seleciona todas as colunas disponíveis para maior compatibilidade
+            system_logs = query_db('''
+                SELECT id, timestamp, username, action, details, ip_address, message, level, created_at
+                FROM system_logs 
+                ORDER BY timestamp DESC, created_at DESC
+                LIMIT 50
+            ''')
         except Exception as e:
             system_logs = []
             flash(f"Erro ao buscar logs do sistema: {str(e)}")
@@ -402,10 +376,8 @@ def admin():
         formatted_logs = []
         for log in system_logs:
             try:
-                timestamp = log.get('timestamp', 'N/A')
-                username = log.get('username', 'N/A')
-                action = log.get('action', 'N/A')
-                details = log.get('details', 'N/A')
+                # Usa timestamp se disponível, senão usa created_at
+                timestamp = log.get('timestamp', log.get('created_at', 'N/A'))
                 
                 # Formata a data/hora para exibição
                 if isinstance(timestamp, str):
@@ -417,7 +389,20 @@ def admin():
                         # Mantém como string se não conseguir converter
                         pass
                 
-                formatted_log = f"[{timestamp}] {username}: {action} - {details}"
+                # Usa username se disponível
+                username = log.get('username', 'sistema')
+                
+                # Usa action e details primariamente, message como fallback
+                if log.get('action') and log.get('details'):
+                    action = log.get('action', '')
+                    details = log.get('details', '')
+                    formatted_log = f"[{timestamp}] {username}: {action} - {details}"
+                else:
+                    # Use message quando action/details não estão disponíveis
+                    message = log.get('message', 'Sem detalhes')
+                    level = log.get('level', 'info')
+                    formatted_log = f"[{timestamp}] {username} [{level}]: {message}"
+                
                 formatted_logs.append(formatted_log)
             except Exception as log_error:
                 formatted_logs.append(f"[Erro ao formatar log] {str(log_error)}")
@@ -1235,10 +1220,30 @@ def log_activity(username, action, details, ip_address=None):
         ip_address: Endereço IP (opcional)
     """
     try:
-        query_db(
-            'INSERT INTO system_logs (username, action, details, ip_address) VALUES (?, ?, ?, ?)',
-            [username, action, details, ip_address]
-        )
+        # Insere compatível com ambos os esquemas (original e o real do Render)
+        if IS_PRODUCTION:
+            # No Render, garantir que preenchemos tanto colunas novas quanto antigas
+            query_db(
+                '''
+                INSERT INTO system_logs 
+                (username, action, details, ip_address, message, level) 
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                [
+                    username, 
+                    action, 
+                    details, 
+                    ip_address, 
+                    f"{action}: {details}", # message como combinação de action+details
+                    "info"  # level padrão
+                ]
+            )
+        else:
+            # No ambiente de desenvolvimento, usar apenas as colunas originais
+            query_db(
+                'INSERT INTO system_logs (username, action, details, ip_address) VALUES (?, ?, ?, ?)',
+                [username, action, details, ip_address]
+            )
         return True
     except Exception as e:
         print(f"Erro ao registrar log: {str(e)}")
