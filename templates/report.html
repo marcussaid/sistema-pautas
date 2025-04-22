@@ -146,6 +146,7 @@
                             data-assunto="{{ registro['assunto'] }}"
                             data-status="{{ registro['status'] }}"
                             data-data="{{ registro['data'] }}"
+                            data-local="{{ registro['local'] }}"
                             data-direcionamentos="{{ registro['direcionamentos'] }}"
                             data-registro-id="{{ registro['id'] }}">
                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white transition-colors duration-200 column-data">
@@ -945,6 +946,18 @@ function aplicarFiltrosAvancados() {
     // Obtém todas as linhas da tabela
     const rows = document.querySelectorAll('[data-demanda-row]');
     
+    // Log de todos os valores locais
+    console.log('--- Valores de local em todas as linhas ---');
+    rows.forEach((row, index) => {
+        const localRaw = row.dataset.local;
+        const localNormalizado = normalizarTexto(localRaw || '');
+        console.log(`Linha ${index + 1}:`, {
+            localRaw: localRaw,
+            localNormalizado: localNormalizado
+        });
+    });
+    console.log('----------------------------------------');
+    
     let visibleCount = 0;
     
     rows.forEach(row => {
@@ -959,6 +972,18 @@ function aplicarFiltrosAvancados() {
         // Debug para o campo Local
         if (local.includes('auditorio') || local.includes('smec')) {
             console.log('Encontrado local com Auditório - SMEC:', local);
+        }
+        
+        // Se o termo contém "auditorio" ou "smec", mostrar detalhes de correspondência
+        if (termo.includes('auditorio') || termo.includes('smec')) {
+            console.log('Verificando correspondência local:', {
+                termo: termo,
+                local: local,
+                localIncluesTermo: local.includes(termo),
+                localIncludesAuditorio: local.includes('auditorio'),
+                localIncludesSmec: local.includes('smec'),
+                auditorio_smec_juntos: local.includes('auditorio - smec')
+            });
         }
         
         // Verifica se a linha atende a todos os critérios de filtro
