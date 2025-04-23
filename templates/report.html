@@ -4,7 +4,7 @@
     <div class="mb-8 flex flex-col sm:flex-row justify-between items-center">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0 transition-colors duration-200">Relatório de Demandas</h1>
         <div class="flex items-center space-x-2">
-            <a href="{{ url_for('form') }}" class="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
+            <a href="{{ url_for('form') }}" class="bg-teal-500 dark:bg-teal-600 hover:bg-teal-600 dark:hover:bg-teal-500 text-white font-bold py-2 px-4 rounded transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
                 <i class="fas fa-plus mr-2"></i>Nova Demanda
             </a>
             {% if current_user.is_superuser %}
@@ -47,7 +47,7 @@
         <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
             <div class="flex items-center justify-between mb-2">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white transition-colors duration-200">Pesquisa Avançada</h2>
-                <button id="toggleSearch" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors duration-200">
+                <button id="toggleSearch" class="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-200 transition-colors duration-200">
                     <i class="fas fa-chevron-down" id="searchIcon"></i>
                 </button>
             </div>
@@ -87,7 +87,7 @@
                             <i class="fas fa-eraser mr-2"></i>Limpar
                         </button>
                         <button type="button" id="aplicarFiltrosAvancados" 
-                                class="bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
+                                class="bg-teal-500 dark:bg-teal-600 hover:bg-teal-600 dark:hover:bg-teal-500 text-white font-bold py-2 px-4 rounded transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
                             <i class="fas fa-search mr-2"></i>Pesquisar
                         </button>
                     </div>
@@ -103,7 +103,7 @@
                     <span id="registrosCounter">Mostrando {{ registros|length }} registro(s)</span>
                 </div>
                 <div class="flex space-x-2">
-                    <button id="toggleColumns" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none transition-colors duration-200">
+                    <button id="toggleColumns" class="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 focus:outline-none transition-colors duration-200">
                         <i class="fas fa-columns mr-1"></i>Colunas
                     </button>
 <!-- Removendo botões de redimensionar -->
@@ -115,7 +115,7 @@
     <i class="fas fa-compress-arrows-alt mr-1"></i>-
 </button>
 -->
-                    <select id="sortSelect" class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all duration-200">
+                    <select id="sortSelect" class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400 transition-all duration-200">
                         <option value="data-desc">Data (mais recente)</option>
                         <option value="data-asc">Data (mais antiga)</option>
                         <option value="demanda-asc">Demanda (A-Z)</option>
@@ -167,7 +167,7 @@
                             <td class="px-4 py-4 whitespace-nowrap text-sm transition-colors duration-200 column-status">
                                 <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
                                     {% if registro['status'] == 'Em andamento' %}
-                                        bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800
+                                        bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800
                                     {% elif registro['status'] == 'Concluído' %}
                                         bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800
                                     {% elif registro['status'] == 'Pendente' %}
@@ -181,7 +181,7 @@
                             </td>
                             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white transition-colors duration-200 column-acoes">
                                 <div class="flex items-center justify-center space-x-2">
-                                    <button class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 focus:outline-none transition-colors duration-200" 
+                                    <button class="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 focus:outline-none transition-colors duration-200" 
                                             data-id="{{ registro.id }}"
                                             data-demanda="{{ registro.demanda }}"
                                             data-data="{{ registro.data }}"
@@ -291,32 +291,32 @@
             </div>
             <div class="space-y-3">
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-data" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-data" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-data" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Data</label>
                 </div>
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-demanda" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-demanda" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-demanda" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Demanda</label>
                 </div>
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-assunto" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-assunto" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-assunto" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Assunto</label>
                 </div>
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-local" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-local" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-local" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Local</label>
                 </div>
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-direcionamentos" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-direcionamentos" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-direcionamentos" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Direcionamentos</label>
                 </div>
                 <div class="flex items-center">
-                    <input type="checkbox" id="toggle-status" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                    <input type="checkbox" id="toggle-status" class="h-4 w-4 text-teal-500 focus:ring-teal-400 border-gray-300 rounded" checked>
                     <label for="toggle-status" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Status</label>
                 </div>
             </div>
             <div class="mt-6 flex justify-end">
-                <button onclick="closeColumnsModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <button onclick="closeColumnsModal()" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded">
                     Aplicar
                 </button>
             </div>
@@ -383,7 +383,7 @@ function showDetails(demanda, data, assunto, local, direcionamentos, status, ult
     statusEl.className = 'inline-block px-2 py-1 text-sm rounded-full mt-1 transition-colors duration-200';
     
     if (status === 'Em andamento') {
-        statusEl.classList.add('bg-blue-100', 'dark:bg-blue-900/50', 'text-blue-800', 'dark:text-blue-300', 'border', 'border-blue-200', 'dark:border-blue-800');
+        statusEl.classList.add('bg-teal-100', 'dark:bg-teal-900/50', 'text-teal-800', 'dark:text-teal-300', 'border', 'border-teal-200', 'dark:border-teal-800');
     } else if (status === 'Concluído') {
         statusEl.classList.add('bg-green-100', 'dark:bg-green-900/50', 'text-green-800', 'dark:text-green-300', 'border', 'border-green-200', 'dark:border-green-800');
     } else if (status === 'Pendente') {
@@ -720,7 +720,7 @@ function showToast(message, type = 'info') {
     } else if (type === 'error') {
         toast.classList.add('bg-red-600', 'text-white');
     } else {
-        toast.classList.add('bg-blue-600', 'text-white');
+        toast.classList.add('bg-teal-500', 'text-white');
     }
     
     // Adicionar mensagem
