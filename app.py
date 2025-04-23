@@ -744,94 +744,43 @@ def download_anexo(registro_id, anexo_id):
 @login_required
 def view_image(registro_id, anexo_id):
     """
-    Rota para visualizar imagens diretamente no navegador, sem forçar o download.
-    Usado para exibir miniaturas e visualização expandida de imagens.
+    Rota simplificada para visualizar imagens diretamente no navegador.
     """
-    print(f"[DEBUG] Requisição para view_image: registro_id={registro_id}, anexo_id={anexo_id}")
-    
-    # Verifica se o registro existe
-    registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
-    if not registro:
-        print(f"[DEBUG] Registro {registro_id} não encontrado")
-        return "Registro não encontrado", 404
-    
-    # Obtém os anexos
     try:
-        if isinstance(registro['anexos'], str):
-            anexos = json.loads(registro['anexos'])
-            print(f"[DEBUG] Anexos carregados de string JSON")
-        else:
-            anexos = registro['anexos']
-            print(f"[DEBUG] Anexos obtidos diretamente do objeto")
+        # Verifica se o registro existe
+        registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
+        if not registro:
+            return "Registro não encontrado", 404
         
-        print(f"[DEBUG] Total de anexos: {len(anexos)}")
-    except (json.JSONDecodeError, TypeError) as e:
-        print(f"[DEBUG] Erro ao processar anexos: {str(e)}")
-        return "Erro ao processar anexos", 500
-    
-    # Procura o anexo pelo ID
-    anexo = next((a for a in anexos if a['id'] == anexo_id), None)
-    if not anexo:
-        print(f"[DEBUG] Anexo {anexo_id} não encontrado")
-        return "Anexo não encontrado", 404
-    
-    print(f"[DEBUG] Anexo encontrado: {anexo}")
-    
-    # Define o caminho do arquivo
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
-    print(f"[DEBUG] Caminho do arquivo: {filepath}")
-    print(f"[DEBUG] Arquivo existe: {os.path.exists(filepath)}")
-    
-    # Verifica se o arquivo existe
-    if not os.path.exists(filepath):
-        print(f"[DEBUG] Arquivo não encontrado no servidor: {filepath}")
+        # Obtém os anexos
         try:
-            print(f"[DEBUG] Conteúdo do diretório: {os.listdir(app.config['UPLOAD_FOLDER'])}")
-        except Exception as e:
-            print(f"[DEBUG] Erro ao listar diretório: {str(e)}")
+            if isinstance(registro['anexos'], str):
+                anexos = json.loads(registro['anexos'])
+            else:
+                anexos = registro['anexos']
+        except (json.JSONDecodeError, TypeError) as e:
+            return "Erro ao processar anexos", 500
         
-        # Em vez de retornar um erro, tenta servir a imagem pela nova rota
-        return redirect(url_for('serve_image', filename=anexo['nome_sistema']))
+        # Procura o anexo pelo ID
+        anexo = next((a for a in anexos if a['id'] == anexo_id), None)
+        if not anexo:
+            return "Anexo não encontrado", 404
+        
+        # Define o caminho do arquivo
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
+        
+        # Se o arquivo não existir, retornamos um erro amigável
+        if not os.path.exists(filepath):
+            return send_from_directory(app.static_folder, 'img/image-not-found.png')
+        
+        # Envia o arquivo como resposta HTTP, sem especificar mimetype
+        # para que o navegador detecte automaticamente
+        return send_file(filepath, as_attachment=False)
     
-    # Verifica se é um tipo de imagem
-    nome_original = anexo['nome_original'].lower()
-    print(f"[DEBUG] Nome original do arquivo: {nome_original}")
-    
-    # Define mapeamento de extensões para tipos MIME
-    mime_types = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp'
-    }
-    
-    # Verifica a extensão e obtém o tipo MIME
-    mime_type = None
-    for ext, mime in mime_types.items():
-        if nome_original.endswith(ext):
-            mime_type = mime
-            break
-    
-    # Se não é uma imagem suportada, retorna erro
-    if not mime_type:
-        print(f"[DEBUG] Tipo de arquivo não suportado: {nome_original}")
-        return "Arquivo não é uma imagem suportada", 400
-    
-    print(f"[DEBUG] Enviando arquivo com MIME type: {mime_type}")
-    
-    # Tenta enviar o arquivo diretamente
-    try:
-        return send_file(
-            filepath,
-            mimetype=mime_type,
-            download_name=anexo['nome_original'],
-            as_attachment=False
-        )
     except Exception as e:
-        print(f"[DEBUG] Erro ao enviar arquivo: {str(e)}")
-        # Em caso de erro, tenta usar a nova rota
-        return redirect(url_for('serve_image', filename=anexo['nome_sistema']))
+        print(f"Erro ao servir imagem: {str(e)}")
+        # Em caso de erro, retorna uma imagem padrão de erro
+        return send_from_directory(app.static_folder, 'img/image-error.png')
 
 @app.route('/delete_anexo/<int:registro_id>/<anexo_id>', methods=['DELETE'])
 @login_required

@@ -278,15 +278,6 @@
                         <p id="modalAnexosCarregando" class="text-sm text-gray-500 italic">Carregando anexos...</p>
                         <p id="modalSemAnexos" class="text-sm text-gray-500 italic hidden">Nenhum anexo disponível</p>
                     </div>
-                    <!-- Contêiner para visualização expandida de imagens -->
-                    <div id="imageViewerContainer" class="hidden mt-4">
-                        <div class="relative">
-                            <img id="expandedImage" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-md" src="" alt="Anexo">
-                            <button onclick="closeImageViewer()" class="absolute top-2 right-2 bg-white dark:bg-gray-800 rounded-full p-1 shadow-md text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -403,9 +394,6 @@ function loadAnexos(registroId) {
     carregandoElement.classList.remove('hidden');
     semAnexosElement.classList.add('hidden');
     
-    // Ocultar o visualizador de imagem expandida
-    document.getElementById('imageViewerContainer').classList.add('hidden');
-    
     // Buscar anexos via API
     fetch(`/edit/${registroId}`)
         .then(response => response.text())
@@ -439,41 +427,19 @@ function loadAnexos(registroId) {
                     // Criar visualização em miniatura para imagens
                     const imgElement = document.createElement('img');
                     
-                    // Obter o nome_sistema a partir da função de anexo
-                    // Este é o nome do arquivo no sistema
-                    const anexoButtons = anexoEl.querySelectorAll('button');
-                    let nomeArquivo = '';
+                    // Configurar a imagem com URL direta
+                    imgElement.src = `/view_image/${registroId}/${anexoId}`;
+                    imgElement.alt = nomeAnexo;
+                    imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
                     
-                    // Tentar extrair o nome do arquivo
-                    try {
-                        // O nome do arquivo no sistema é extraído do ID do anexo
-                        // Como não temos acesso direto ao nome_sistema, usamos os IDs
-                        console.log('Tentando obter nome do arquivo para anexo:', anexoId);
-                        
-                        // Usamos o ID diretamente para a solicitação
-                        // A implementação fallback obterá o arquivo correto através da rota view_image
-                        nomeArquivo = anexoId;
-                        
-                        // Usar nova rota robusta para imagens
-                        imgElement.src = `/view_image/${registroId}/${anexoId}`;
-                        imgElement.alt = nomeAnexo;
-                        imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
-                        imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
-                        
-                        // Adicionar tratamento de erro para a imagem
-                        imgElement.onerror = function() {
-                            console.error('Erro ao carregar imagem:', nomeAnexo);
-                            // Adicionar timestamp para evitar cache
-                            const timestamp = new Date().getTime();
-                            imgElement.src = `/view_image/${registroId}/${anexoId}?t=${timestamp}`;
-                        };
-                    } catch (e) {
-                        console.error('Erro ao processar anexo:', e);
-                        imgElement.src = `/view_image/${registroId}/${anexoId}`;
-                        imgElement.alt = nomeAnexo;
-                        imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
-                        imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
-                    }
+                    // Usar função simplificada para exibir imagem ampliada na mesma página
+                    imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
+                    
+                    // Adicionar tratamento de erro para a imagem
+                    imgElement.onerror = function() {
+                        console.error('Erro ao carregar imagem:', nomeAnexo);
+                        imgElement.src = '/static/img/image-not-found.png';
+                    };
                     
                     anexoItem.appendChild(imgElement);
                 } else {
@@ -513,11 +479,51 @@ function loadAnexos(registroId) {
 
 // Função para exibir imagem expandida
 function showExpandedImage(src, alt) {
-    const expandedImage = document.getElementById('expandedImage');
+    // Verifica se já existe uma seção de imagem ampliada
+    let expandedSection = document.getElementById('expandedImageSection');
+    
+    // Se não existir, cria a seção
+    if (!expandedSection) {
+        expandedSection = document.createElement('div');
+        expandedSection.id = 'expandedImageSection';
+        expandedSection.className = 'mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 text-center';
+        
+        const title = document.createElement('p');
+        title.className = 'text-sm text-gray-500 dark:text-gray-400 mb-2';
+        title.textContent = 'Visualização ampliada';
+        expandedSection.appendChild(title);
+        
+        // Adiciona a seção ao final do modal
+        document.getElementById('modalContent').querySelector('.p-6').appendChild(expandedSection);
+    }
+    
+    // Limpa o conteúdo anterior
+    expandedSection.innerHTML = '';
+    
+    // Cria e adiciona o título
+    const title = document.createElement('p');
+    title.className = 'text-sm text-gray-500 dark:text-gray-400 mb-2';
+    title.textContent = 'Visualização ampliada';
+    expandedSection.appendChild(title);
+    
+    // Cria e adiciona a imagem ampliada
+    const expandedImage = document.createElement('img');
     expandedImage.src = src;
     expandedImage.alt = alt || 'Imagem anexada';
+    expandedImage.className = 'max-w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-md';
+    expandedImage.style.maxHeight = '500px';
+    expandedSection.appendChild(expandedImage);
     
-    document.getElementById('imageViewerContainer').classList.remove('hidden');
+    // Adiciona tratamento de erro para a imagem
+    expandedImage.onerror = function() {
+        console.error('Erro ao carregar imagem ampliada:', src);
+        expandedImage.src = '/static/img/image-error.png';
+    };
+    
+    // Faz scroll até a imagem ampliada
+    setTimeout(() => {
+        expandedSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
 }
 
 // Função para fechar o visualizador de imagem
@@ -954,23 +960,13 @@ function printModalDetails() {
                         <div class="anexo-nome">${nome}</div>
                     </div>
                 `;
-            } else {
-                // Se não for imagem, apenas mostra o nome
-                anexosHtml += `
-                    <div class="anexo-item">
-                        <div class="anexo-icon">
-                            <i class="fa fa-file"></i>
-                        </div>
-                        <div class="anexo-nome">${nome} (Arquivo não visualizável)</div>
-                    </div>
-                `;
             }
         });
         
         anexosHtml += `
-                </div>
-            </div>
-        `;
+                 </div>
+             </div>
+         `;
     }
     
     // Cria o conteúdo HTML para impressão
@@ -1289,4 +1285,3 @@ function aplicarFiltrosAvancados() {
 }
 </script>
 {% endblock %}
-
