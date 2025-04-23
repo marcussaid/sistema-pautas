@@ -17,8 +17,8 @@ IS_PRODUCTION = os.environ.get('RENDER', False) or 'DATABASE_URL' in os.environ
 
 # Configuração da pasta de uploads
 if IS_PRODUCTION:
-    # No Render, use o diretório persistente configurado nas env vars ou o default
-    app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/uploads')
+    # No Render, use um diretório dentro da pasta da aplicação
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'storage', 'uploads')
     print(f"[INFO] Ambiente de produção detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
 else:
     # Em desenvolvimento local, use o diretório da aplicação
