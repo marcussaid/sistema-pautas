@@ -214,7 +214,7 @@
                 <nav class="flex items-center justify-between">
                     <div>
                         <p class="text-sm text-gray-700 dark:text-gray-300 transition-colors duration-200">
-                            Exibindo <span class="font-medium">{{ registros|length }}</span> registros
+                            Exibindo <span class="font-medium" id="registrosCounterFooter">{{ registros|length }}</span> registros
                         </p>
                     </div>
                     <!-- Aqui pode ser adicionada paginação futuramente -->
@@ -519,10 +519,12 @@ document.getElementById('searchInput').addEventListener('input', function(e) {
     
     // Atualiza o contador
     document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
+    document.getElementById('registrosCounterFooter').textContent = visibleCount;
     
     // Exibe mensagem se nenhum resultado for encontrado
     if (visibleCount === 0 && searchValue.trim() !== '') {
         document.getElementById('registrosCounter').textContent = `Nenhum registro encontrado para "${searchValue}"`;
+        document.getElementById('registrosCounterFooter').textContent = '0';
     }
 });
 
@@ -546,6 +548,7 @@ document.getElementById('statusFilter').addEventListener('change', function(e) {
     
     // Atualiza o contador
     document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
+    document.getElementById('registrosCounterFooter').textContent = visibleCount;
 });
 
 // Ordenação da tabela
@@ -750,6 +753,10 @@ function updateRecordCounter() {
     if (counter) {
         counter.textContent = `Mostrando ${visibleRows.length} registro(s)`;
     }
+    const counterFooter = document.getElementById('registrosCounterFooter');
+    if (counterFooter) {
+        counterFooter.textContent = visibleRows.length;
+    }
 }
 
 // Função para imprimir os detalhes do modal
@@ -930,6 +937,7 @@ document.getElementById('limparFiltros').addEventListener('click', function() {
     
     // Atualiza o contador
     document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
+    document.getElementById('registrosCounterFooter').textContent = visibleCount;
 });
 
 function aplicarFiltrosAvancados() {
@@ -1035,11 +1043,13 @@ function aplicarFiltrosAvancados() {
     
     // Atualiza o contador
     document.getElementById('registrosCounter').textContent = `Mostrando ${visibleCount} registro(s)`;
+    document.getElementById('registrosCounterFooter').textContent = visibleCount;
     
     // Feedback sobre a pesquisa
     if (visibleCount === 0 && termo) {
         // Exibe mensagem de nenhum resultado
         document.getElementById('registrosCounter').textContent = `Nenhum registro encontrado para "${document.getElementById('termoAvancado').value}"`;
+        document.getElementById('registrosCounterFooter').textContent = '0';
     } else if (visibleCount > 0) {
         // Adiciona uma mensagem de filtro aplicado
         const statusText = status ? `Status: ${status.charAt(0).toUpperCase() + status.slice(1)}` : '';
