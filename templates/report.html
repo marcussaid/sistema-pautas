@@ -438,7 +438,11 @@ function loadAnexos(registroId) {
                     // Adicionar tratamento de erro para a imagem
                     imgElement.onerror = function() {
                         console.error('Erro ao carregar imagem:', nomeAnexo);
-                        imgElement.src = '/static/img/image-not-found.png';
+                        // Substituir a imagem por um texto de erro
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'w-24 h-24 flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-red-500 dark:text-red-400 text-xs text-center p-2 rounded';
+                        errorDiv.innerHTML = '<span>Erro ao carregar imagem</span>';
+                        imgElement.replaceWith(errorDiv);
                     };
                     
                     anexoItem.appendChild(imgElement);
@@ -517,7 +521,15 @@ function showExpandedImage(src, alt) {
     // Adiciona tratamento de erro para a imagem
     expandedImage.onerror = function() {
         console.error('Erro ao carregar imagem ampliada:', src);
-        expandedImage.src = '/static/img/image-error.png';
+        // Criar um elemento de erro para substituir a imagem
+        const errorElement = document.createElement('div');
+        errorElement.className = 'bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-center border border-red-300 dark:border-red-700';
+        errorElement.innerHTML = `
+            <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2"></i>
+            <p class="text-red-600 dark:text-red-400">Erro ao carregar imagem</p>
+            <p class="text-gray-600 dark:text-gray-400 text-sm mt-2">A imagem "${alt}" não pôde ser carregada</p>
+        `;
+        expandedImage.replaceWith(errorElement);
     };
     
     // Faz scroll até a imagem ampliada
