@@ -394,6 +394,13 @@ function loadAnexos(registroId) {
     carregandoElement.classList.remove('hidden');
     semAnexosElement.classList.add('hidden');
     
+    // Limpar a seção de imagem expandida, se existir
+    const expandedSection = document.getElementById('expandedImageSection');
+    if (expandedSection) {
+        expandedSection.innerHTML = '';
+        expandedSection.remove(); // Removemos completamente para garantir uma experiência limpa
+    }
+    
     // Buscar anexos via API
     fetch(`/edit/${registroId}`)
         .then(response => response.text())
@@ -430,10 +437,7 @@ function loadAnexos(registroId) {
                     // Configurar a imagem com URL direta
                     imgElement.src = `/view_image/${registroId}/${anexoId}`;
                     imgElement.alt = nomeAnexo;
-                    imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
-                    
-                    // Usar função simplificada para exibir imagem ampliada na mesma página
-                    imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
+                    imgElement.className = 'w-24 h-24 object-cover rounded mb-1';
                     
                     // Adicionar tratamento de erro para a imagem
                     imgElement.onerror = function() {
@@ -443,6 +447,54 @@ function loadAnexos(registroId) {
                         errorDiv.className = 'w-24 h-24 flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-red-500 dark:text-red-400 text-xs text-center p-2 rounded';
                         errorDiv.innerHTML = '<span>Erro ao carregar imagem</span>';
                         imgElement.replaceWith(errorDiv);
+                    };
+                    
+                    // Ao clicar na miniatura, mostrar a imagem em tamanho maior
+                    imgElement.onclick = function() {
+                        // Criar ou obter seção de imagem ampliada
+                        let expandedSection = document.getElementById('expandedImageSection');
+                        if (!expandedSection) {
+                            expandedSection = document.createElement('div');
+                            expandedSection.id = 'expandedImageSection';
+                            expandedSection.className = 'mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 text-center';
+                            document.getElementById('modalContent').querySelector('.p-6').appendChild(expandedSection);
+                        }
+                        
+                        // Limpa o conteúdo anterior
+                        expandedSection.innerHTML = '';
+                        
+                        // Adiciona título
+                        const title = document.createElement('p');
+                        title.className = 'text-sm text-gray-500 dark:text-gray-400 mb-2';
+                        title.textContent = `Visualização: ${nomeAnexo}`;
+                        expandedSection.appendChild(title);
+                        
+                        // Adiciona a imagem ampliada
+                        const expandedImage = document.createElement('img');
+                        expandedImage.src = `/view_image/${registroId}/${anexoId}`;
+                        expandedImage.alt = nomeAnexo;
+                        expandedImage.className = 'max-w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-md';
+                        expandedImage.style.maxHeight = '500px';
+                        expandedSection.appendChild(expandedImage);
+                        
+                        // Adiciona tratamento de erro
+                        expandedImage.onerror = function() {
+                            console.error('Erro ao carregar imagem ampliada:', nomeAnexo);
+                            // Criar elemento de erro
+                            const errorElement = document.createElement('div');
+                            errorElement.className = 'bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-center border border-red-300 dark:border-red-700';
+                            errorElement.innerHTML = `
+                                <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2"></i>
+                                <p class="text-red-600 dark:text-red-400">Erro ao carregar imagem</p>
+                                <p class="text-gray-600 dark:text-gray-400 text-sm mt-2">A imagem "${nomeAnexo}" não pôde ser carregada</p>
+                            `;
+                            expandedImage.replaceWith(errorElement);
+                        };
+                        
+                        // Fazer scroll até a imagem
+                        setTimeout(() => {
+                            expandedSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }, 100);
                     };
                     
                     anexoItem.appendChild(imgElement);
@@ -461,15 +513,6 @@ function loadAnexos(registroId) {
                 nameElement.title = nomeAnexo;
                 anexoItem.appendChild(nameElement);
                 
-                // Botão para download
-                const downloadButton = document.createElement('a');
-                downloadButton.href = `/download_anexo/${registroId}/${anexoId}`;
-                downloadButton.className = 'text-blue-600 dark:text-blue-400 hover:text-blue-800 mt-1';
-                downloadButton.title = 'Download';
-                downloadButton.innerHTML = '<i class="fas fa-download"></i>';
-                downloadButton.target = '_blank';
-                anexoItem.appendChild(downloadButton);
-                
                 anexosContainer.appendChild(anexoItem);
             });
         })
@@ -479,68 +522,6 @@ function loadAnexos(registroId) {
             semAnexosElement.classList.remove('hidden');
             semAnexosElement.textContent = 'Erro ao carregar anexos';
         });
-}
-
-// Função para exibir imagem expandida
-function showExpandedImage(src, alt) {
-    // Verifica se já existe uma seção de imagem ampliada
-    let expandedSection = document.getElementById('expandedImageSection');
-    
-    // Se não existir, cria a seção
-    if (!expandedSection) {
-        expandedSection = document.createElement('div');
-        expandedSection.id = 'expandedImageSection';
-        expandedSection.className = 'mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 text-center';
-        
-        const title = document.createElement('p');
-        title.className = 'text-sm text-gray-500 dark:text-gray-400 mb-2';
-        title.textContent = 'Visualização ampliada';
-        expandedSection.appendChild(title);
-        
-        // Adiciona a seção ao final do modal
-        document.getElementById('modalContent').querySelector('.p-6').appendChild(expandedSection);
-    }
-    
-    // Limpa o conteúdo anterior
-    expandedSection.innerHTML = '';
-    
-    // Cria e adiciona o título
-    const title = document.createElement('p');
-    title.className = 'text-sm text-gray-500 dark:text-gray-400 mb-2';
-    title.textContent = 'Visualização ampliada';
-    expandedSection.appendChild(title);
-    
-    // Cria e adiciona a imagem ampliada
-    const expandedImage = document.createElement('img');
-    expandedImage.src = src;
-    expandedImage.alt = alt || 'Imagem anexada';
-    expandedImage.className = 'max-w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-md';
-    expandedImage.style.maxHeight = '500px';
-    expandedSection.appendChild(expandedImage);
-    
-    // Adiciona tratamento de erro para a imagem
-    expandedImage.onerror = function() {
-        console.error('Erro ao carregar imagem ampliada:', src);
-        // Criar um elemento de erro para substituir a imagem
-        const errorElement = document.createElement('div');
-        errorElement.className = 'bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-center border border-red-300 dark:border-red-700';
-        errorElement.innerHTML = `
-            <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2"></i>
-            <p class="text-red-600 dark:text-red-400">Erro ao carregar imagem</p>
-            <p class="text-gray-600 dark:text-gray-400 text-sm mt-2">A imagem "${alt}" não pôde ser carregada</p>
-        `;
-        expandedImage.replaceWith(errorElement);
-    };
-    
-    // Faz scroll até a imagem ampliada
-    setTimeout(() => {
-        expandedSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 100);
-}
-
-// Função para fechar o visualizador de imagem
-function closeImageViewer() {
-    document.getElementById('imageViewerContainer').classList.add('hidden');
 }
 
 // Função para mostrar detalhes do registro
