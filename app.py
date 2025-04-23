@@ -792,7 +792,10 @@ def delete_anexo(registro_id, anexo_id):
     
     try:
         # Carrega os anexos existentes
-        anexos = json.loads(registro['anexos']) if registro['anexos'] else []
+        if isinstance(registro['anexos'], str):
+            anexos = json.loads(registro['anexos'])
+        else:
+            anexos = registro['anexos']  # Se já for uma lista/dict (PostgreSQL JSONB)
         
         # Encontra o anexo pelo ID
         anexo_encontrado = None
@@ -816,14 +819,11 @@ def delete_anexo(registro_id, anexo_id):
             print(f"Erro ao excluir arquivo físico: {str(e)}")
         
         # Atualiza o banco de dados
-        if sqlite3_version >= (3, 30, 0):
-            # SQLite (JSON)
-            query_db('UPDATE registros SET anexos = json(?), data_ultima_edicao = CURRENT_TIMESTAMP, ultimo_editor = ? WHERE id = ?', 
-                     [json.dumps(anexos), current_user.username, registro_id])
-        else:
-            # SQLite (TEXT)
-            query_db('UPDATE registros SET anexos = ?, data_ultima_edicao = CURRENT_TIMESTAMP, ultimo_editor = ? WHERE id = ?', 
-                     [json.dumps(anexos), current_user.username, registro_id])
+        # Converte para string JSON apenas se não estiver usando PostgreSQL
+        anexos_json = json.dumps(anexos) if not IS_PRODUCTION else anexos
+        
+        query_db('UPDATE registros SET anexos = ?, data_ultima_edicao = CURRENT_TIMESTAMP, ultimo_editor = ? WHERE id = ?', 
+                [anexos_json, current_user.username, registro_id])
     
         return jsonify({'success': True})
     except Exception as e:
