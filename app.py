@@ -12,6 +12,10 @@ from psycopg2.extras import DictCursor
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
 
+# Configuração da pasta de uploads
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 # Configuração do Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -639,14 +643,10 @@ def upload_anexo(registro_id):
     if file.filename == '':
         return jsonify({'error': 'Nenhum arquivo selecionado.'}), 400
     
-    # Cria a pasta de anexos se não existir
-    upload_folder = os.path.join(app.root_path, 'uploads')
-    os.makedirs(upload_folder, exist_ok=True)
-    
     # Gera um nome seguro para o arquivo
     filename = secure_filename(file.filename)
     unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-    filepath = os.path.join(upload_folder, unique_filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     
     # Salva o arquivo
     file.save(filepath)
@@ -715,7 +715,7 @@ def download_anexo(registro_id, anexo_id):
         return redirect(url_for('edit_registro', registro_id=registro_id))
     
     # Define o caminho do arquivo
-    filepath = os.path.join(app.root_path, 'uploads', anexo['nome_sistema'])
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
     
     # Verifica se o arquivo existe
     if not os.path.exists(filepath):
@@ -756,7 +756,7 @@ def view_image(registro_id, anexo_id):
         return "Anexo não encontrado", 404
     
     # Define o caminho do arquivo
-    filepath = os.path.join(app.root_path, 'uploads', anexo['nome_sistema'])
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
     
     # Verifica se o arquivo existe
     if not os.path.exists(filepath):
@@ -764,12 +764,31 @@ def view_image(registro_id, anexo_id):
     
     # Verifica se é um tipo de imagem
     nome_original = anexo['nome_original'].lower()
-    if not any(nome_original.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
-        return "Arquivo não é uma imagem", 400
     
-    # Envia a imagem para visualização (sem forçar download)
+    # Define mapeamento de extensões para tipos MIME
+    mime_types = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp'
+    }
+    
+    # Verifica a extensão e obtém o tipo MIME
+    mime_type = None
+    for ext, mime in mime_types.items():
+        if nome_original.endswith(ext):
+            mime_type = mime
+            break
+    
+    # Se não é uma imagem suportada, retorna erro
+    if not mime_type:
+        return "Arquivo não é uma imagem suportada", 400
+    
+    # Envia a imagem para visualização com o tipo MIME correto
     return send_file(
         filepath,
+        mimetype=mime_type,
         download_name=anexo['nome_original'],
         as_attachment=False
     )
@@ -800,7 +819,7 @@ def delete_anexo(registro_id, anexo_id):
         anexos = [a for a in anexos if a.get('id') != anexo_id]
         
         # Tenta remover o arquivo físico, se existir
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo_encontrado.get('filename', ''))
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo_encontrado.get('nome_sistema', ''))
         try:
             if os.path.exists(filepath):
                 os.remove(filepath)
