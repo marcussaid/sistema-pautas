@@ -233,9 +233,9 @@
 
 <!-- Modal de Detalhes -->
 <div id="detailsModal" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 hidden transition-opacity duration-200">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 transition-all duration-200 transform scale-95 opacity-0" id="modalContent">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col transition-all duration-200 transform scale-95 opacity-0" id="modalContent">
+        <div class="p-6 overflow-y-auto flex-grow">
+            <div class="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-gray-800 z-10 pb-2">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200" id="modalTitle"></h2>
                 <div class="flex items-center space-x-2">
                     <button onclick="printModalDetails()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200" title="Imprimir detalhes">
@@ -268,20 +268,20 @@
                     <p class="inline-block px-2 py-1 text-sm rounded-full mt-1 transition-colors duration-200" id="modalStatus"></p>
                 </div>
                 <div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">Última Edição</p>
-                    <p class="text-lg text-gray-900 dark:text-white transition-colors duration-200" id="modalUltimaEdicao"></p>
-                </div>
-                <!-- Nova seção para anexos -->
-                <div id="modalAnexosContainer" class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-                    <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200 mb-2">Anexos</p>
-                    <div id="modalAnexos" class="flex flex-wrap gap-2">
-                        <p id="modalAnexosCarregando" class="text-sm text-gray-500 italic">Carregando anexos...</p>
-                        <p id="modalSemAnexos" class="text-sm text-gray-500 italic hidden">Nenhum anexo disponível</p>
-                    </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">Última Edição</p>
+                <p class="text-lg text-gray-900 dark:text-white transition-colors duration-200 break-words whitespace-pre-line" id="modalUltimaEdicao"></p>
+            </div>
+            <!-- Nova seção para anexos -->
+            <div id="modalAnexosContainer" class="pt-4 mt-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200 mb-2">Anexos</p>
+                <div id="modalAnexos" class="flex flex-wrap gap-2">
+                    <p id="modalAnexosCarregando" class="text-sm text-gray-500 italic">Carregando anexos...</p>
+                    <p id="modalSemAnexos" class="text-sm text-gray-500 italic hidden">Nenhum anexo disponível</p>
                 </div>
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Conteúdo para impressão (invisível na página) -->
