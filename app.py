@@ -12,17 +12,28 @@ from psycopg2.extras import DictCursor
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
 
+# Detecta o ambiente (development vs. production)
+IS_PRODUCTION = os.environ.get('RENDER', False) or 'DATABASE_URL' in os.environ
+
 # Configuração da pasta de uploads
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+if IS_PRODUCTION:
+    # No Render, use o diretório persistente configurado nas env vars ou o default
+    app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/uploads')
+    print(f"[INFO] Ambiente de produção detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
+else:
+    # Em desenvolvimento local, use o diretório da aplicação
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+    print(f"[INFO] Ambiente de desenvolvimento detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
+
+# Certifique-se de que o diretório existe
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+print(f"[INFO] Diretório de uploads existe: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
+print(f"[INFO] Caminho absoluto do diretório de uploads: {os.path.abspath(app.config['UPLOAD_FOLDER'])}")
 
 # Configuração do Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
-# Detecta o ambiente (development vs. production)
-IS_PRODUCTION = os.environ.get('RENDER', False) or 'DATABASE_URL' in os.environ
 
 # Configuração do banco de dados
 if IS_PRODUCTION:
@@ -736,34 +747,55 @@ def view_image(registro_id, anexo_id):
     Rota para visualizar imagens diretamente no navegador, sem forçar o download.
     Usado para exibir miniaturas e visualização expandida de imagens.
     """
+    print(f"[DEBUG] Requisição para view_image: registro_id={registro_id}, anexo_id={anexo_id}")
+    
     # Verifica se o registro existe
     registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
     if not registro:
+        print(f"[DEBUG] Registro {registro_id} não encontrado")
         return "Registro não encontrado", 404
     
     # Obtém os anexos
     try:
         if isinstance(registro['anexos'], str):
             anexos = json.loads(registro['anexos'])
+            print(f"[DEBUG] Anexos carregados de string JSON")
         else:
             anexos = registro['anexos']
-    except (json.JSONDecodeError, TypeError):
+            print(f"[DEBUG] Anexos obtidos diretamente do objeto")
+        
+        print(f"[DEBUG] Total de anexos: {len(anexos)}")
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"[DEBUG] Erro ao processar anexos: {str(e)}")
         return "Erro ao processar anexos", 500
     
     # Procura o anexo pelo ID
     anexo = next((a for a in anexos if a['id'] == anexo_id), None)
     if not anexo:
+        print(f"[DEBUG] Anexo {anexo_id} não encontrado")
         return "Anexo não encontrado", 404
+    
+    print(f"[DEBUG] Anexo encontrado: {anexo}")
     
     # Define o caminho do arquivo
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
+    print(f"[DEBUG] Caminho do arquivo: {filepath}")
+    print(f"[DEBUG] Arquivo existe: {os.path.exists(filepath)}")
     
     # Verifica se o arquivo existe
     if not os.path.exists(filepath):
-        return "Arquivo não encontrado no servidor", 404
+        print(f"[DEBUG] Arquivo não encontrado no servidor: {filepath}")
+        try:
+            print(f"[DEBUG] Conteúdo do diretório: {os.listdir(app.config['UPLOAD_FOLDER'])}")
+        except Exception as e:
+            print(f"[DEBUG] Erro ao listar diretório: {str(e)}")
+        
+        # Em vez de retornar um erro, tenta servir a imagem pela nova rota
+        return redirect(url_for('serve_image', filename=anexo['nome_sistema']))
     
     # Verifica se é um tipo de imagem
     nome_original = anexo['nome_original'].lower()
+    print(f"[DEBUG] Nome original do arquivo: {nome_original}")
     
     # Define mapeamento de extensões para tipos MIME
     mime_types = {
@@ -783,15 +815,23 @@ def view_image(registro_id, anexo_id):
     
     # Se não é uma imagem suportada, retorna erro
     if not mime_type:
+        print(f"[DEBUG] Tipo de arquivo não suportado: {nome_original}")
         return "Arquivo não é uma imagem suportada", 400
     
-    # Envia a imagem para visualização com o tipo MIME correto
-    return send_file(
-        filepath,
-        mimetype=mime_type,
-        download_name=anexo['nome_original'],
-        as_attachment=False
-    )
+    print(f"[DEBUG] Enviando arquivo com MIME type: {mime_type}")
+    
+    # Tenta enviar o arquivo diretamente
+    try:
+        return send_file(
+            filepath,
+            mimetype=mime_type,
+            download_name=anexo['nome_original'],
+            as_attachment=False
+        )
+    except Exception as e:
+        print(f"[DEBUG] Erro ao enviar arquivo: {str(e)}")
+        # Em caso de erro, tenta usar a nova rota
+        return redirect(url_for('serve_image', filename=anexo['nome_sistema']))
 
 @app.route('/delete_anexo/<int:registro_id>/<anexo_id>', methods=['DELETE'])
 @login_required
@@ -1440,6 +1480,20 @@ def table_info():
             'traceback': traceback.format_exc()
         }
         return jsonify(error), 500
+
+@app.route('/images/<path:filename>')
+@login_required
+def serve_image(filename):
+    """
+    Rota simples para servir imagens diretamente do diretório de uploads.
+    Esta abordagem é mais robusta para ambientes como o Render.
+    """
+    print(f"[DEBUG] Tentando servir imagem: {filename}")
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        print(f"[DEBUG] Erro ao servir imagem {filename}: {str(e)}")
+        return f"Erro ao servir imagem: {str(e)}", 500
 
 if __name__ == '__main__':
     # Garantir que as tabelas do banco de dados existam

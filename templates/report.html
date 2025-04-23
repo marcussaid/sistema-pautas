@@ -438,10 +438,43 @@ function loadAnexos(registroId) {
                 if (isImage) {
                     // Criar visualização em miniatura para imagens
                     const imgElement = document.createElement('img');
-                    imgElement.src = `/view_image/${registroId}/${anexoId}`;
-                    imgElement.alt = nomeAnexo;
-                    imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
-                    imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
+                    
+                    // Obter o nome_sistema a partir da função de anexo
+                    // Este é o nome do arquivo no sistema
+                    const anexoButtons = anexoEl.querySelectorAll('button');
+                    let nomeArquivo = '';
+                    
+                    // Tentar extrair o nome do arquivo
+                    try {
+                        // O nome do arquivo no sistema é extraído do ID do anexo
+                        // Como não temos acesso direto ao nome_sistema, usamos os IDs
+                        console.log('Tentando obter nome do arquivo para anexo:', anexoId);
+                        
+                        // Usamos o ID diretamente para a solicitação
+                        // A implementação fallback obterá o arquivo correto através da rota view_image
+                        nomeArquivo = anexoId;
+                        
+                        // Usar nova rota robusta para imagens
+                        imgElement.src = `/view_image/${registroId}/${anexoId}`;
+                        imgElement.alt = nomeAnexo;
+                        imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
+                        imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
+                        
+                        // Adicionar tratamento de erro para a imagem
+                        imgElement.onerror = function() {
+                            console.error('Erro ao carregar imagem:', nomeAnexo);
+                            // Adicionar timestamp para evitar cache
+                            const timestamp = new Date().getTime();
+                            imgElement.src = `/view_image/${registroId}/${anexoId}?t=${timestamp}`;
+                        };
+                    } catch (e) {
+                        console.error('Erro ao processar anexo:', e);
+                        imgElement.src = `/view_image/${registroId}/${anexoId}`;
+                        imgElement.alt = nomeAnexo;
+                        imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
+                        imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
+                    }
+                    
                     anexoItem.appendChild(imgElement);
                 } else {
                     // Ícone para arquivos não-imagem
