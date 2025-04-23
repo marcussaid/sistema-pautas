@@ -438,10 +438,10 @@ function loadAnexos(registroId) {
                 if (isImage) {
                     // Criar visualização em miniatura para imagens
                     const imgElement = document.createElement('img');
-                    imgElement.src = `/download_anexo/${registroId}/${anexoId}`;
+                    imgElement.src = `/view_image/${registroId}/${anexoId}`;
                     imgElement.alt = nomeAnexo;
                     imgElement.className = 'w-24 h-24 object-cover rounded cursor-pointer mb-1';
-                    imgElement.onclick = () => showExpandedImage(imgElement.src, nomeAnexo);
+                    imgElement.onclick = () => showExpandedImage(`/view_image/${registroId}/${anexoId}`, nomeAnexo);
                     anexoItem.appendChild(imgElement);
                 } else {
                     // Ícone para arquivos não-imagem

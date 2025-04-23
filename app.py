@@ -729,6 +729,51 @@ def download_anexo(registro_id, anexo_id):
         as_attachment=True
     )
 
+@app.route('/view_image/<int:registro_id>/<anexo_id>')
+@login_required
+def view_image(registro_id, anexo_id):
+    """
+    Rota para visualizar imagens diretamente no navegador, sem forçar o download.
+    Usado para exibir miniaturas e visualização expandida de imagens.
+    """
+    # Verifica se o registro existe
+    registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
+    if not registro:
+        return "Registro não encontrado", 404
+    
+    # Obtém os anexos
+    try:
+        if isinstance(registro['anexos'], str):
+            anexos = json.loads(registro['anexos'])
+        else:
+            anexos = registro['anexos']
+    except (json.JSONDecodeError, TypeError):
+        return "Erro ao processar anexos", 500
+    
+    # Procura o anexo pelo ID
+    anexo = next((a for a in anexos if a['id'] == anexo_id), None)
+    if not anexo:
+        return "Anexo não encontrado", 404
+    
+    # Define o caminho do arquivo
+    filepath = os.path.join(app.root_path, 'uploads', anexo['nome_sistema'])
+    
+    # Verifica se o arquivo existe
+    if not os.path.exists(filepath):
+        return "Arquivo não encontrado no servidor", 404
+    
+    # Verifica se é um tipo de imagem
+    nome_original = anexo['nome_original'].lower()
+    if not any(nome_original.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+        return "Arquivo não é uma imagem", 400
+    
+    # Envia a imagem para visualização (sem forçar download)
+    return send_file(
+        filepath,
+        download_name=anexo['nome_original'],
+        as_attachment=False
+    )
+
 @app.route('/delete_anexo/<int:registro_id>/<anexo_id>', methods=['DELETE'])
 @login_required
 def delete_anexo(registro_id, anexo_id):
