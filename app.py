@@ -1444,8 +1444,77 @@ def serve_image(filename):
         print(f"[DEBUG] Erro ao servir imagem {filename}: {str(e)}")
         return f"Erro ao servir imagem: {str(e)}", 500
 
+import io
+import zipfile
+import csv
+
 if __name__ == '__main__':
     # Garantir que as tabelas do banco de dados existam
     ensure_tables()
     # Iniciar o servidor Flask
     app.run(debug=True, host='0.0.0.0', port=8000)
+
+@app.route('/export_all_tables', methods=['GET'])
+@login_required
+def export_all_tables():
+    if not current_user.is_superuser:
+        flash('Acesso negado: apenas administradores podem exportar todas as tabelas.')
+        return redirect(url_for('admin'))
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Obter lista de tabelas no banco de dados
+        if IS_PRODUCTION:
+            cur.execute("""
+                SELECT tablename FROM pg_tables
+                WHERE schemaname = 'public'
+            """)
+            tables = [row[0] for row in cur.fetchall()]
+        else:
+            cur.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """)
+            tables = [row[0] for row in cur.fetchall()]
+
+        # Criar arquivo zip em memória
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for table in tables:
+                # Exportar dados da tabela para CSV
+                if IS_PRODUCTION:
+                    cur.execute(f'SELECT * FROM {table}')
+                    rows = cur.fetchall()
+                    colnames = [desc[0] for desc in cur.description]
+                else:
+                    cur.execute(f'SELECT * FROM {table}')
+                    rows = cur.fetchall()
+                    colnames = [desc[0] for desc in cur.description]
+
+                csv_buffer = io.StringIO()
+                writer = csv.writer(csv_buffer, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+                writer.writerow(colnames)
+                for row in rows:
+                    writer.writerow(row)
+
+                # Adicionar CSV ao zip
+                csv_filename = f'{table}.csv'
+                zip_file.writestr(csv_filename, csv_buffer.getvalue())
+
+        cur.close()
+        conn.close()
+
+        zip_buffer.seek(0)
+        response = make_response(zip_buffer.read())
+        response.headers['Content-Disposition'] = f'attachment; filename=export_all_tables_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'
+        response.headers['Content-Type'] = 'application/zip'
+        response.headers['Cache-Control'] = 'no-cache'
+
+        return response
+
+    except Exception as e:
+        print(f"Erro ao exportar todas as tabelas: {str(e)}")
+        flash(f'Erro ao exportar todas as tabelas: {str(e)}')
+        return redirect(url_for('admin'))
