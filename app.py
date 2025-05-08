@@ -3,6 +3,7 @@ import os
 import json
 from werkzeug.utils import secure_filename
 from datetime import datetime, date
+from s3_utils import S3Handler
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import sqlite3
 import psycopg2
@@ -13,22 +14,18 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
 
 # Detecta o ambiente (development vs. production)
-IS_PRODUCTION = os.environ.get('RENDER', False) or 'DATABASE_URL' in os.environ
+IS_PRODUCTION = os.environ.get('RENDER', False)
 
-# Configuração da pasta de uploads
+# Configuração de uploads
 if IS_PRODUCTION:
-    # No Render, use um diretório dentro da pasta da aplicação
-    app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'storage', 'uploads')
-    print(f"[INFO] Ambiente de produção detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
+    # No Render, use S3
+    s3 = S3Handler()
+    print("[INFO] Ambiente de produção detectado. Usando AWS S3 para uploads.")
 else:
     # Em desenvolvimento local, use o diretório da aplicação
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
     print(f"[INFO] Ambiente de desenvolvimento detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
-
-# Certifique-se de que o diretório existe
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-print(f"[INFO] Diretório de uploads existe: {os.path.exists(app.config['UPLOAD_FOLDER'])}")
-print(f"[INFO] Caminho absoluto do diretório de uploads: {os.path.abspath(app.config['UPLOAD_FOLDER'])}")
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Configuração do Flask-Login
 login_manager = LoginManager()
@@ -659,8 +656,17 @@ def upload_anexo(registro_id):
     unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     
-    # Salva o arquivo
-    file.save(filepath)
+    # Salva o arquivo (S3 em produção, local em desenvolvimento)
+    if IS_PRODUCTION:
+        result = s3.upload_file(file)
+        if not result['success']:
+            return jsonify({'error': 'Erro ao fazer upload do arquivo.'}), 500
+        
+        filepath = result['s3_path']
+        unique_filename = result['filename']
+    else:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(filepath)
     
     # Obtém os anexos atuais
     try:
@@ -728,17 +734,30 @@ def download_anexo(registro_id, anexo_id):
     # Define o caminho do arquivo
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
     
-    # Verifica se o arquivo existe
-    if not os.path.exists(filepath):
-        flash('Arquivo não encontrado no servidor.')
-        return redirect(url_for('edit_registro', registro_id=registro_id))
-    
-    # Envia o arquivo para download
-    return send_file(
-        filepath,
-        download_name=anexo['nome_original'],
-        as_attachment=True
-    )
+    if IS_PRODUCTION:
+        # Em produção, gera URL do S3
+        file_data = s3.download_file(anexo['nome_sistema'])
+        if file_data is None:
+            flash('Arquivo não encontrado no servidor.')
+            return redirect(url_for('edit_registro', registro_id=registro_id))
+        
+        # Cria uma resposta com o conteúdo do arquivo
+        response = make_response(file_data)
+        response.headers['Content-Disposition'] = f'attachment; filename={anexo["nome_original"]}'
+        response.headers['Content-Type'] = 'application/octet-stream'
+        return response
+    else:
+        # Em desenvolvimento, usa o sistema de arquivos local
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
+        if not os.path.exists(filepath):
+            flash('Arquivo não encontrado no servidor.')
+            return redirect(url_for('edit_registro', registro_id=registro_id))
+        
+        return send_file(
+            filepath,
+            download_name=anexo['nome_original'],
+            as_attachment=True
+        )
 
 @app.route('/view_image/<int:registro_id>/<anexo_id>')
 @login_required
@@ -766,20 +785,21 @@ def view_image(registro_id, anexo_id):
         if not anexo:
             return "Anexo não encontrado", 404
         
-        # Define o caminho do arquivo
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
-        
-        # Se o arquivo não existir, retornamos um erro amigável
-        if not os.path.exists(filepath):
+        if IS_PRODUCTION:
+            # Em produção, gera URL do S3
+            url = s3.get_file_url(anexo['nome_sistema'])
+            if url:
+                return redirect(url)
             return send_from_directory(app.static_folder, 'img/image-not-found.png')
-        
-        # Envia o arquivo como resposta HTTP, sem especificar mimetype
-        # para que o navegador detecte automaticamente
-        return send_file(filepath, as_attachment=False)
+        else:
+            # Em desenvolvimento, usa o sistema de arquivos local
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo['nome_sistema'])
+            if not os.path.exists(filepath):
+                return send_from_directory(app.static_folder, 'img/image-not-found.png')
+            return send_file(filepath, as_attachment=False)
     
     except Exception as e:
         print(f"Erro ao servir imagem: {str(e)}")
-        # Em caso de erro, retorna uma imagem padrão de erro
         return send_from_directory(app.static_folder, 'img/image-error.png')
 
 @app.route('/delete_anexo/<int:registro_id>/<anexo_id>', methods=['DELETE'])
@@ -810,13 +830,21 @@ def delete_anexo(registro_id, anexo_id):
         # Remove o anexo da lista
         anexos = [a for a in anexos if a.get('id') != anexo_id]
         
-        # Tenta remover o arquivo físico, se existir
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo_encontrado.get('nome_sistema', ''))
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except Exception as e:
-            print(f"Erro ao excluir arquivo físico: {str(e)}")
+        # Remove o arquivo
+        if IS_PRODUCTION:
+            s3_path = anexo_encontrado.get('nome_sistema', '')
+            if s3_path:
+                try:
+                    s3.delete_file(s3_path)
+                except Exception as e:
+                    print(f"Erro ao excluir arquivo do S3: {str(e)}")
+        else:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], anexo_encontrado.get('nome_sistema', ''))
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except Exception as e:
+                print(f"Erro ao excluir arquivo físico: {str(e)}")
         
         # Atualiza o banco de dados
         # Converte para string JSON apenas se não estiver usando PostgreSQL

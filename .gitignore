@@ -16,18 +16,17 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# SQLite database
-*.db
-database.db
-
 # Virtual Environment
 venv/
 ENV/
+
+# Environment Variables
+.env
+.env.*
 
 # IDE
 .idea/
@@ -35,9 +34,11 @@ ENV/
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# Local Development
+*.db
+*.sqlite3
+uploads/
+storage/
 
-# Ignorar logs
-app_log.txt
+# Logs
+*.log
