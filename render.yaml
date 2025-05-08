@@ -13,6 +13,16 @@ services:
       mountPath: /uploads
       sizeGB: 1
     envVars:
+      - key: RENDER
+        value: true
+      - key: AWS_ACCESS_KEY_ID
+        value: AKIA6K5V7IBO8LCA3AX3
+      - key: AWS_SECRET_ACCESS_KEY
+        value: GuVsYxyGpmIiHDZyX3udbLwEmCnq/mBRaxtPWn7p
+      - key: AWS_DEFAULT_REGION
+        value: us-east-1
+      - key: AWS_BUCKET_NAME
+        value: mybucketmarcussaidrr
       - key: PYTHON_VERSION
         value: 3.9.12
       - key: PORT
