@@ -10,17 +10,17 @@ class S3Handler:
         
         # Valores padrão do render.yaml
         default_values = {
-            "AWS_ACCESS_KEY_ID": "AKIA6K5V7IBO8LCA3AX3",
-            "AWS_SECRET_ACCESS_KEY": "GuVsYxyGpmIiHDZyX3udbLwEmCnq/mBRaxtPWn7p",
-            "AWS_DEFAULT_REGION": "us-east-1",
-            "AWS_BUCKET_NAME": "mybucketmarcussaidrr"
+            'AWS_ACCESS_KEY_ID': 'AKIA6K5V7IBO8LCA3AX3',
+            'AWS_SECRET_ACCESS_KEY': 'GuVsYxyGpmIiHDZyX3udbLwEmCnq/mBRaxtPWn7p',
+            'AWS_DEFAULT_REGION': 'us-east-1',
+            'AWS_BUCKET_NAME': 'mybucketmarcussaidrr'
         }
         
         # Usar valores do ambiente ou fallback para valores padrão
-        self.aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID", default_values["AWS_ACCESS_KEY_ID"])
-        self.aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY", default_values["AWS_SECRET_ACCESS_KEY"])
-        self.aws_region = os.environ.get("AWS_DEFAULT_REGION", default_values["AWS_DEFAULT_REGION"])
-        self.bucket_name = os.environ.get("AWS_BUCKET_NAME", default_values["AWS_BUCKET_NAME"])
+        self.aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID', default_values['AWS_ACCESS_KEY_ID'])
+        self.aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY', default_values['AWS_SECRET_ACCESS_KEY'])
+        self.aws_region = os.environ.get('AWS_DEFAULT_REGION', default_values['AWS_DEFAULT_REGION'])
+        self.bucket_name = os.environ.get('AWS_BUCKET_NAME', default_values['AWS_BUCKET_NAME'])
 
         print(f"[INFO] AWS_ACCESS_KEY_ID presente: {bool(self.aws_access_key_id)}")
         print(f"[INFO] AWS_SECRET_ACCESS_KEY presente: {bool(self.aws_secret_access_key)}")
@@ -29,7 +29,7 @@ class S3Handler:
 
         try:
             self.s3_client = boto3.client(
-                "s3",
+                's3',
                 aws_access_key_id=self.aws_access_key_id,
                 aws_secret_access_key=self.aws_secret_access_key,
                 region_name=self.aws_region
@@ -40,10 +40,10 @@ class S3Handler:
             print(f"[INFO] Conexão com bucket {self.bucket_name} estabelecida com sucesso")
 
         except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "Unknown")
-            if error_code == "403":
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            if error_code == '403':
                 error_msg = f"[ERROR] Acesso negado ao bucket {self.bucket_name}. Verifique as credenciais AWS."
-            elif error_code == "404":
+            elif error_code == '404':
                 error_msg = f"[ERROR] Bucket {self.bucket_name} não encontrado."
             else:
                 error_msg = f"[ERROR] Erro ao conectar ao S3: {str(e)}"
@@ -58,14 +58,14 @@ class S3Handler:
             print(error_msg)
             raise Exception(error_msg)
 
-    def upload_file(self, file, prefix="uploads/"):
+    def upload_file(self, file, prefix='uploads/'):
         """
         Upload a file to S3
         """
         if not file:
             error_msg = "[ERROR] Nenhum arquivo fornecido"
             print(error_msg)
-            return {"success": False, "error": error_msg}
+            return {'success': False, 'error': error_msg}
 
         try:
             print(f"[INFO] Iniciando upload do arquivo {file.filename} para S3...")
@@ -75,9 +75,9 @@ class S3Handler:
             if not filename:
                 error_msg = "[ERROR] Nome de arquivo inválido"
                 print(error_msg)
-                return {"success": False, "error": error_msg}
+                return {'success': False, 'error': error_msg}
 
-            unique_filename = f"{datetime.now().strftime("%Y%m%d%H%M%S")}_{filename}"
+            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
             s3_path = f"{prefix}{unique_filename}"
 
             print(f"[INFO] Nome do arquivo processado: {unique_filename}")
@@ -95,26 +95,26 @@ class S3Handler:
             print(f"[INFO] Upload concluído. URL gerada: {url}")
 
             return {
-                "success": True,
-                "filename": unique_filename,
-                "original_name": filename,
-                "s3_path": s3_path,
-                "url": url
+                'success': True,
+                'filename': unique_filename,
+                'original_name': filename,
+                's3_path': s3_path,
+                'url': url
             }
         except ClientError as e:
             error_msg = f"[ERROR] Erro ao fazer upload para S3: {str(e)}"
             print(error_msg)
-            print(f"[ERROR] Detalhes do erro: {e.response["Error"]}")
+            print(f"[ERROR] Detalhes do erro: {e.response['Error']}")
             return {
-                "success": False,
-                "error": error_msg
+                'success': False,
+                'error': error_msg
             }
         except Exception as e:
             error_msg = f"[ERROR] Erro inesperado: {str(e)}"
             print(error_msg)
             return {
-                "success": False,
-                "error": error_msg
+                'success': False,
+                'error': error_msg
             }
 
     def download_file(self, s3_path):
@@ -124,7 +124,7 @@ class S3Handler:
         try:
             print(f"[INFO] Baixando arquivo {s3_path} do S3...")
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=s3_path)
-            return response["Body"].read()
+            return response['Body'].read()
         except ClientError as e:
             print(f"[ERROR] Erro ao baixar arquivo do S3: {str(e)}")
             return None
@@ -148,10 +148,10 @@ class S3Handler:
         try:
             print(f"[INFO] Gerando URL para {s3_path}...")
             url = self.s3_client.generate_presigned_url(
-                "get_object",
+                'get_object',
                 Params={
-                    "Bucket": self.bucket_name,
-                    "Key": s3_path
+                    'Bucket': self.bucket_name,
+                    'Key': s3_path
                 },
                 ExpiresIn=3600  # URL expires in 1 hour
             )
