@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify, send_from_directory, send_file
+import traceback
 import os
 import json
 from werkzeug.utils import secure_filename
@@ -546,35 +547,50 @@ def estatisticas():
 @login_required
 def report():
     try:
+        print("[DEBUG] Iniciando carregamento do relatório...")
+        
         # Busca todos os registros ordenados por data (mais recentes primeiro)
+        print("[DEBUG] Executando query para buscar registros...")
         registros = query_db('''
             SELECT * FROM registros
             ORDER BY data DESC, id DESC
         ''')
+        print(f"[DEBUG] {len(registros) if registros else 0} registros encontrados")
         
         # Processa os anexos de cada registro
+        print("[DEBUG] Processando anexos dos registros...")
         for registro in registros:
             try:
                 if 'anexos' in registro and registro['anexos']:
+                    print(f"[DEBUG] Processando anexos do registro {registro.get('id')}")
+                    print(f"[DEBUG] Tipo dos anexos: {type(registro['anexos'])}")
+                    print(f"[DEBUG] Conteúdo dos anexos: {registro['anexos']}")
+                    
                     # Se for string (SQLite), converte para JSON
                     if isinstance(registro['anexos'], str):
                         try:
                             registro['anexos'] = json.loads(registro['anexos'])
-                        except json.JSONDecodeError:
-                            print(f"Erro ao decodificar JSON dos anexos do registro {registro.get('id')}")
+                            print(f"[DEBUG] Anexos convertidos com sucesso para JSON")
+                        except json.JSONDecodeError as je:
+                            print(f"[DEBUG] Erro ao decodificar JSON dos anexos: {str(je)}")
                             registro['anexos'] = []
                     # Se já for um objeto (PostgreSQL JSONB), mantém como está
                     elif not isinstance(registro['anexos'], list):
+                        print(f"[DEBUG] Anexos não são uma lista, resetando para lista vazia")
                         registro['anexos'] = []
                 else:
+                    print(f"[DEBUG] Registro {registro.get('id')} não tem anexos")
                     registro['anexos'] = []
             except Exception as e:
-                print(f"Erro ao processar anexos do registro {registro.get('id')}: {str(e)}")
+                print(f"[DEBUG] Erro ao processar anexos do registro {registro.get('id')}: {str(e)}")
+                print(f"[DEBUG] Traceback completo: {traceback.format_exc()}")
                 registro['anexos'] = []
         
+        print("[DEBUG] Renderizando template...")
         return render_template('report.html', registros=registros, status_list=STATUS_CHOICES)
     except Exception as e:
-        print(f"Erro ao carregar relatório: {str(e)}")
+        print(f"[DEBUG] Erro ao carregar relatório: {str(e)}")
+        print(f"[DEBUG] Traceback completo: {traceback.format_exc()}")
         flash('Erro ao carregar o relatório. Por favor, tente novamente.')
         return redirect(url_for('index'))
 
