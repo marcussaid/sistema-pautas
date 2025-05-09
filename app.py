@@ -400,118 +400,99 @@ def admin():
             flash('Acesso negado: você não tem permissão para acessar essa página.')
             return redirect(url_for('form'))
             
-        users = query_db('SELECT * FROM users ORDER BY username')
-        
-        # Obtém estatísticas atualizadas do banco de dados
-        stats = get_stats()
-        stats['total_usuarios'] = len(users)
-        
-        # Busca os logs mais recentes do sistema - versão compatível
-        try:
-            # Seleciona todas as colunas disponíveis para maior compatibilidade
-            system_logs = query_db('''
-                SELECT id, timestamp, username, action, details, ip_address, message, level, created_at
-                FROM system_logs 
-                ORDER BY timestamp DESC, created_at DESC
-                LIMIT 50
-            ''')
-        except Exception as e:
-            system_logs = []
-            flash(f"Erro ao buscar logs do sistema: {str(e)}")
-            print(f"Erro ao buscar logs do sistema: {str(e)}")
-        
-        # Formata os logs para exibição
-        formatted_logs = []
-        for log in system_logs:
-            try:
-                # Usa timestamp se disponível, senão usa created_at
-                timestamp = log.get('timestamp', log.get('created_at', 'N/A'))
-                
-                # Formata a data/hora para exibição
-                if isinstance(timestamp, str):
-                    # Analisa a string de data/hora
-                    try:
-                        from datetime import datetime
-                        timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                    except:
-                        # Mantém como string se não conseguir converter
-                        pass
-                
-                # Usa username se disponível
-                username = log.get('username', 'sistema')
-                
-                # Usa action e details primariamente, message como fallback
-                if log.get('action') and log.get('details'):
-                    action = log.get('action', '')
-                    details = log.get('details', '')
-                    formatted_log = f"[{timestamp}] {username}: {action} - {details}"
-                else:
-                    # Use message quando action/details não estão disponíveis
-                    message = log.get('message', 'Sem detalhes')
-                    level = log.get('level', 'info')
-                    formatted_log = f"[{timestamp}] {username} [{level}]: {message}"
-                
-                formatted_logs.append(formatted_log)
-            except Exception as log_error:
-                formatted_logs.append(f"[Erro ao formatar log] {str(log_error)}")
-        
-        settings = {
-            'per_page': 10,
-            'session_timeout': 60,
-            'auto_backup': 'daily'
-        }
-        
-        return render_template('admin.html', users=users, stats=stats, system_logs=formatted_logs, settings=settings)
-    except Exception as e:
-        import traceback
-        error_message = f"Erro interno na página de administração: {str(e)}"
-        print(error_message)
-        print(traceback.format_exc())
-        flash(error_message)
-        return redirect(url_for('index'))
-
-@app.route('/admin/user/<int:user_id>', methods=['PUT'])
-@login_required
-def update_user(user_id):
-    if not current_user.is_superuser:
-        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
-        
-    data = request.get_json()
-    username = data.get('username')
-    is_superuser = data.get('is_superuser')
-    password = data.get('password')
-    
-    if not username:
-        return jsonify({'success': False, 'message': 'Nome de usuário não pode estar vazio'}), 400
-        
-    try:
-        if password:
-            # Se uma nova senha foi fornecida, atualize-a também
-            query_db('UPDATE users SET username = ?, is_superuser = ?, password = ? WHERE id = ?', 
-                    [username, is_superuser, password, user_id])
+        if IS_PRODUCTION:
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db("""
+                SELECT *,
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros 
+                ORDER BY data DESC
+            """)
+            # Ajusta os campos de data para o formato correto
+            for registro in registros:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
         else:
-            # Caso contrário, apenas atualize o nome de usuário e o status de superusuário
-            query_db('UPDATE users SET username = ?, is_superuser = ? WHERE id = ?', 
-                    [username, is_superuser, user_id])
-        return jsonify({'success': True})
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db('SELECT * FROM registros ORDER BY data DESC')
+            
+        return render_template('admin.html', users=users, registros=registros)
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/admin/user/<int:user_id>', methods=['DELETE', 'POST'])
+        print(f"[ERROR] Erro na rota admin: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao carregar página de administração.')
+        return redirect(url_for('form'))
+@app.route('/admin')
 @login_required
-def delete_user(user_id):
-    if not current_user.is_superuser:
-        flash('Acesso negado: você não tem permissão para realizar essa ação.')
-        return redirect(url_for('admin'))
-        
-    if current_user.id == user_id:
-        flash('Você não pode excluir sua própria conta!')
-        return redirect(url_for('admin'))
-        
-    query_db('DELETE FROM users WHERE id = ?', [user_id])
-    flash('Usuário excluído com sucesso!')
-    return redirect(url_for('admin'))
-
+def admin():
+    print("[INFO] Acessando rota /admin")
+    print(f"[INFO] current_user: {current_user}, is_authenticated: {current_user.is_authenticated}")
+    
+    try:
+        if not hasattr(current_user, 'is_superuser') or not current_user.is_superuser:
+            print("[ERROR] Usuário não é superusuário")
+            flash('Acesso negado: você não tem permissão para acessar essa página.')
+            return redirect(url_for('form'))
+            
+        if IS_PRODUCTION:
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db("""
+                SELECT *,
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros 
+                ORDER BY data DESC
+            """)
+            # Ajusta os campos de data para o formato correto
+            for registro in registros:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        else:
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db('SELECT * FROM registros ORDER BY data DESC')
+            
+        return render_template('admin.html', users=users, registros=registros)
+    except Exception as e:
+        print(f"[ERROR] Erro na rota admin: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao carregar página de administração.')
+        return redirect(url_for('form'))
+@app.route('/admin')
+@login_required
+def admin():
+    print("[INFO] Acessando rota /admin")
+    print(f"[INFO] current_user: {current_user}, is_authenticated: {current_user.is_authenticated}")
+    
+    try:
+        if not hasattr(current_user, 'is_superuser') or not current_user.is_superuser:
+            print("[ERROR] Usuário não é superusuário")
+            flash('Acesso negado: você não tem permissão para acessar essa página.')
+            return redirect(url_for('form'))
+            
+        if IS_PRODUCTION:
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db("""
+                SELECT *,
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros 
+                ORDER BY data DESC
+            """)
+            # Ajusta os campos de data para o formato correto
+            for registro in registros:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        else:
+            users = query_db('SELECT * FROM users ORDER BY username')
+            registros = query_db('SELECT * FROM registros ORDER BY data DESC')
+            
+        return render_template('admin.html', users=users, registros=registros)
+    except Exception as e:
+        print(f"[ERROR] Erro na rota admin: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao carregar página de administração.')
+        return redirect(url_for('form'))
 @app.route('/form', methods=['GET'])
 @login_required
 def form():
@@ -591,10 +572,23 @@ def report():
         
         # Busca todos os registros ordenados por data (mais recentes primeiro)
         print("[DEBUG] Executando query para buscar registros...")
-        registros = query_db('''
-            SELECT * FROM registros
-            ORDER BY data DESC, id DESC
-        ''')
+        if IS_PRODUCTION:
+            registros = query_db('''
+                SELECT *, 
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros
+                ORDER BY data DESC, id DESC
+            ''')
+            # Ajusta os campos de data para o formato correto
+            for registro in registros:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        else:
+            registros = query_db('''
+                SELECT * FROM registros
+                ORDER BY data DESC, id DESC
+            ''')
         print(f"[DEBUG] {len(registros) if registros else 0} registros encontrados")
         
         # Processa os anexos de cada registro
