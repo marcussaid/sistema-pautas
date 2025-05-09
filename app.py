@@ -14,7 +14,7 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
 
 # Detecta o ambiente (development vs. production)
-IS_PRODUCTION = os.environ.get('RENDER', False)
+IS_PRODUCTION = os.environ.get('RENDER', 'false').lower() == 'true'
 
 # Configuração de uploads
 if IS_PRODUCTION:
