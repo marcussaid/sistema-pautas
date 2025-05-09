@@ -735,6 +735,65 @@ def upload_anexo(registro_id):
     except Exception as e:
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
+@app.route('/import_csv', methods=['GET', 'POST'])
+@login_required
+def import_csv():
+    if not current_user.is_superuser:
+        flash('Acesso negado: você não tem permissão para acessar essa página.')
+        return redirect(url_for('form'))
+    
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('Nenhum arquivo selecionado.')
+            return redirect(request.url)
+        
+        file = request.files['file']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado.')
+            return redirect(request.url)
+        
+        if not file.filename.endswith('.csv'):
+            flash('Por favor, selecione um arquivo CSV.')
+            return redirect(request.url)
+        
+        try:
+            # Salva o arquivo temporariamente
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Processa o arquivo CSV
+            import csv
+            with open(filepath, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    # Insere cada linha no banco de dados
+                    query_db('''
+                        INSERT INTO registros 
+                        (data, demanda, assunto, status, local, direcionamentos, ultimo_editor, data_ultima_edicao)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ''', [
+                        row.get('data', ''),
+                        row.get('demanda', ''),
+                        row.get('assunto', ''),
+                        row.get('status', ''),
+                        row.get('local', ''),
+                        row.get('direcionamentos', ''),
+                        current_user.username
+                    ])
+            
+            # Remove o arquivo temporário
+            os.remove(filepath)
+            
+            flash('Registros importados com sucesso!')
+            return redirect(url_for('report'))
+            
+        except Exception as e:
+            flash(f'Erro ao importar registros: {str(e)}')
+            return redirect(request.url)
+    
+    return render_template('import_csv.html')
+
 @app.route('/health')
 def health_check():
     """
