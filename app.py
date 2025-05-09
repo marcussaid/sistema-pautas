@@ -677,12 +677,7 @@ def upload_anexo(registro_id):
         if file.filename == '':
             return jsonify({'error': 'Nenhum arquivo selecionado.'}), 400
         
-        # Gera um nome seguro para o arquivo
-        filename = secure_filename(file.filename)
-        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        
-        # Obtém os anexos atuais antes de fazer o upload
+        # Obtém os anexos atuais
         try:
             if 'anexos' in registro and registro['anexos']:
                 if isinstance(registro['anexos'], str):
@@ -697,28 +692,30 @@ def upload_anexo(registro_id):
         # Gera um ID único para o anexo
         import uuid
         anexo_id = str(uuid.uuid4())
+        filename = secure_filename(file.filename)
 
-        # Salva o arquivo (S3 em produção, local em desenvolvimento)
+        # Processa o upload do arquivo
         if IS_PRODUCTION:
+            # Em produção, usa S3
             result = s3.upload_file(file)
             if not result['success']:
                 return jsonify({'error': 'Erro ao fazer upload do arquivo.'}), 500
             
-            # Adiciona o novo anexo com informações do S3
             novo_anexo = {
                 'id': anexo_id,
                 'nome_original': filename,
                 'nome_sistema': result['filename'],
                 'data_upload': datetime.now().isoformat(),
-                'tamanho': file.content_length,
+                'tamanho': file.content_length or 0,
                 's3_path': result['s3_path'],
                 'url': result['url']
             }
         else:
+            # Em desenvolvimento, salva localmente
+            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
             
-            # Adiciona o novo anexo com informações locais
             novo_anexo = {
                 'id': anexo_id,
                 'nome_original': filename,
@@ -726,6 +723,8 @@ def upload_anexo(registro_id):
                 'data_upload': datetime.now().isoformat(),
                 'tamanho': os.path.getsize(filepath)
             }
+
+        # Adiciona o novo anexo à lista
         anexos.append(novo_anexo)
         
         # Atualiza o registro no banco de dados
@@ -741,81 +740,5 @@ def upload_anexo(registro_id):
             'anexo': novo_anexo
         })
     except Exception as e:
+        print(f"Erro no upload de anexo: {str(e)}")
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-
-@app.route('/import_csv', methods=['GET', 'POST'])
-@login_required
-def import_csv():
-    if not current_user.is_superuser:
-        flash('Acesso negado: você não tem permissão para acessar essa página.')
-        return redirect(url_for('form'))
-    
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('Nenhum arquivo selecionado.')
-            return redirect(request.url)
-        
-        file = request.files['file']
-        if file.filename == '':
-            flash('Nenhum arquivo selecionado.')
-            return redirect(request.url)
-        
-        if not file.filename.endswith('.csv'):
-            flash('Por favor, selecione um arquivo CSV.')
-            return redirect(request.url)
-        
-        try:
-            # Salva o arquivo temporariamente
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            # Processa o arquivo CSV
-            import csv
-            with open(filepath, 'r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    # Insere cada linha no banco de dados
-                    query_db('''
-                        INSERT INTO registros 
-                        (data, demanda, assunto, status, local, direcionamentos, ultimo_editor, data_ultima_edicao)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ''', [
-                        row.get('data', ''),
-                        row.get('demanda', ''),
-                        row.get('assunto', ''),
-                        row.get('status', ''),
-                        row.get('local', ''),
-                        row.get('direcionamentos', ''),
-                        current_user.username
-                    ])
-            
-            # Remove o arquivo temporário
-            os.remove(filepath)
-            
-            flash('Registros importados com sucesso!')
-            return redirect(url_for('report'))
-            
-        except Exception as e:
-            flash(f'Erro ao importar registros: {str(e)}')
-            return redirect(request.url)
-    
-    return render_template('import_csv.html')
-
-@app.route('/health')
-def health_check():
-    """
-    Rota para verificação de saúde do sistema
-    """
-    try:
-        # Tenta fazer uma consulta simples no banco de dados
-        query_db('SELECT 1')
-        return jsonify({'status': 'healthy', 'database': 'connected'}), 200
-    except Exception as e:
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
-
-if __name__ == '__main__':
-    # Garantir que as tabelas do banco de dados existam
-    ensure_tables()
-    # Iniciar o servidor Flask
-    app.run(debug=True, host='0.0.0.0', port=8000)
