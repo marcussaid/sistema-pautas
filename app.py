@@ -13,8 +13,15 @@ from psycopg2.extras import DictCursor
 # Inicialização do Flask
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
+
 # Detecta o ambiente (development vs. production)
 IS_PRODUCTION = os.environ.get('RENDER', 'false').lower() == 'true'
+
+# Configuração do banco de dados
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sistema_demandas_db_user:cP52Pdxr3o1tuCVk5TVs9B6MW5rEF6UR@dpg-cvuif46mcj7s73cetkrg-a/sistema_demandas_db')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
 # Configuração de uploads
 if IS_PRODUCTION:
     # No Render, use S3
@@ -25,21 +32,6 @@ else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
     print(f"[INFO] Ambiente de desenvolvimento detectado. Diretório de uploads: {app.config['UPLOAD_FOLDER']}")
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-# Configuração do Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-@login_manager.unauthorized_handler
-def unauthorized():
-    print("[ERROR] Acesso não autorizado detectado")
-    print(f"[INFO] URL atual: {request.url}")
-    print(f"[INFO] Método: {request.method}")
-    flash('Por favor, faça login para acessar esta página.')
-    return redirect(url_for('login'))
-print("[INFO] Login Manager configurado com sucesso")
-# Configuração do banco de dados
-    # Configuração para PostgreSQL no ambiente de produção (Render)
-    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://sistema_demandas_db_user:cP52Pdxr3o1tuCVk5TVs9B6MW5rEF6UR@dpg-cvuif46mcj7s73cetkrg-a/sistema_demandas_db')
     # Se o DATABASE_URL começa com postgres://, atualize para postgresql://
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
