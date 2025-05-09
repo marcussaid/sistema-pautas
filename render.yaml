@@ -2,7 +2,10 @@ services:
   - type: web
     name: sistema-pautas
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      npm install
+      npm run build
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     healthCheckPath: /health
     healthCheckTimeout: 100
