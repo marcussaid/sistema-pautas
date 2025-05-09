@@ -33,6 +33,16 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    print("[ERROR] Acesso não autorizado detectado")
+    print(f"[INFO] URL atual: {request.url}")
+    print(f"[INFO] Método: {request.method}")
+    flash('Por favor, faça login para acessar esta página.')
+    return redirect(url_for('login'))
+
+print("[INFO] Login Manager configurado com sucesso")
+
 # Configuração do banco de dados
 if IS_PRODUCTION:
     # Configuração para PostgreSQL no ambiente de produção (Render)
@@ -59,10 +69,18 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    user = query_db('SELECT * FROM users WHERE id = ?', [user_id], one=True)
-    if not user:
+    print(f"[INFO] Tentando carregar usuário com ID: {user_id}")
+    try:
+        user = query_db('SELECT * FROM users WHERE id = ?', [user_id], one=True)
+        if not user:
+            print(f"[ERROR] Usuário não encontrado com ID: {user_id}")
+            return None
+        print(f"[INFO] Usuário carregado com sucesso: {user['username']}")
+        return User(user['id'], user['username'], user['is_superuser'])
+    except Exception as e:
+        print(f"[ERROR] Erro ao carregar usuário: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
         return None
-    return User(user['id'], user['username'], user['is_superuser'])
 
 # Função para conexão com banco de dados
 def get_db_connection():
@@ -295,15 +313,28 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    print("[INFO] Acessando rota /login")
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        user = query_db('SELECT * FROM users WHERE username = ? AND password = ?',
-                       [username, password], one=True)
-        if user:
-            login_user(User(user['id'], user['username'], user['is_superuser']))
-            return redirect(url_for('form'))
-        flash('Usuário ou senha inválidos.')
+        print(f"[INFO] Tentativa de login para usuário: {username}")
+        
+        try:
+            user = query_db('SELECT * FROM users WHERE username = ? AND password = ?',
+                          [username, password], one=True)
+            if user:
+                print(f"[INFO] Usuário {username} encontrado, criando objeto User")
+                user_obj = User(user['id'], user['username'], user['is_superuser'])
+                login_user(user_obj)
+                print(f"[INFO] Login realizado com sucesso. ID: {user_obj.id}, is_superuser: {user_obj.is_superuser}")
+                return redirect(url_for('form'))
+            else:
+                print(f"[ERROR] Usuário ou senha inválidos para: {username}")
+                flash('Usuário ou senha inválidos.')
+        except Exception as e:
+            print(f"[ERROR] Erro durante o login: {str(e)}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            flash('Erro ao realizar login. Por favor, tente novamente.')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -360,8 +391,12 @@ def forgot_password():
 @app.route('/admin')
 @login_required
 def admin():
+    print("[INFO] Acessando rota /admin")
+    print(f"[INFO] current_user: {current_user}, is_authenticated: {current_user.is_authenticated}")
+    
     try:
-        if not current_user.is_superuser:
+        if not hasattr(current_user, 'is_superuser') or not current_user.is_superuser:
+            print("[ERROR] Usuário não é superusuário")
             flash('Acesso negado: você não tem permissão para acessar essa página.')
             return redirect(url_for('form'))
             
@@ -546,8 +581,13 @@ def estatisticas():
 @app.route('/report')
 @login_required
 def report():
+    print("[INFO] Acessando rota /report")
+    if not current_user.is_authenticated:
+        print("[ERROR] Usuário não autenticado")
+        return redirect(url_for('login'))
+        
     try:
-        print("[DEBUG] Iniciando carregamento do relatório...")
+        print("[INFO] Usuário autenticado, iniciando carregamento do relatório...")
         
         # Busca todos os registros ordenados por data (mais recentes primeiro)
         print("[DEBUG] Executando query para buscar registros...")
