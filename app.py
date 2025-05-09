@@ -84,50 +84,45 @@ def load_user(user_id):
 
 # Função para conexão com banco de dados
 def get_db_connection():
-    if IS_PRODUCTION:
-        # Conectar ao PostgreSQL
-        conn = psycopg2.connect(DATABASE_URL)
-        conn.autocommit = False
-        return conn
-    else:
-        # Conectar ao SQLite
-        conn = sqlite3.connect(DATABASE_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
-
+    print("[INFO] Iniciando conexão com o banco de dados")
+    print(f"[INFO] Ambiente de produção: {IS_PRODUCTION}")
+    
+    try:
+        if IS_PRODUCTION:
+            # Configuração para PostgreSQL no ambiente de produção (Render)
+            print("[INFO] Conectando ao PostgreSQL...")
+            conn = psycopg2.connect(DATABASE_URL)
+            conn.cursor_factory = DictCursor
+            print("[INFO] Conexão PostgreSQL estabelecida com sucesso")
+            return conn
+        else:
+            # Configuração para SQLite no ambiente de desenvolvimento
+            print("[INFO] Conectando ao SQLite...")
+            conn = sqlite3.connect('database.db')
+            conn.row_factory = sqlite3.Row
+            print("[INFO] Conexão SQLite estabelecida com sucesso")
+            return conn
+    except Exception as e:
+        print(f"[ERROR] Erro ao conectar ao banco de dados: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise
 # Função para consulta ao banco de dados
 def query_db(query, args=(), one=False):
+    print(f"[INFO] Executando query: {query}")
+    print(f"[INFO] Argumentos: {args}")
     try:
         conn = get_db_connection()
-        
-        if IS_PRODUCTION:
-            # PostgreSQL
-            cur = conn.cursor(cursor_factory=DictCursor)
-            # Adapta os placeholders do SQLite (?) para PostgreSQL (%s)
-            query = query.replace('?', '%s')
-        else:
-            # SQLite
-            cur = conn.cursor()
-            # Se a consulta contém %s (placeholder do PostgreSQL), mude para ? (placeholder do SQLite)
-            query = query.replace('%s', '?')
-        
+        cur = conn.cursor()
         cur.execute(query, args)
-        
-        if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP')):
-            conn.commit()
-            rv = cur.rowcount
-        else:
-            if IS_PRODUCTION:
-                # PostgreSQL já retorna os resultados como dicionários com DictCursor
-                rv = [dict(row) for row in cur.fetchall()]
-            else:
-                # SQLite precisa ser convertido para dicionário
-                rv = [dict(zip([column[0] for column in cur.description], row)) for row in cur.fetchall()]
-            
+        rv = cur.fetchall()
+        print(f"[INFO] Query executada com sucesso. Resultados: {len(rv) if rv else 0}")
         cur.close()
         conn.close()
-        
         return (rv[0] if rv else None) if one else rv
+    except Exception as e:
+        print(f"[ERROR] Erro ao executar query: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise
     except Exception as e:
         print(f"Erro na consulta ao banco de dados: {str(e)}")
         if 'conn' in locals() and conn is not None:
