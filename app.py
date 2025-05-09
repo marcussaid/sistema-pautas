@@ -682,19 +682,7 @@ def upload_anexo(registro_id):
         unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         
-        # Salva o arquivo (S3 em produção, local em desenvolvimento)
-        if IS_PRODUCTION:
-            result = s3.upload_file(file)
-            if not result['success']:
-                return jsonify({'error': 'Erro ao fazer upload do arquivo.'}), 500
-            
-            filepath = result['s3_path']
-            unique_filename = result['filename']
-        else:
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(filepath)
-        
-        # Obtém os anexos atuais
+        # Obtém os anexos atuais antes de fazer o upload
         try:
             if 'anexos' in registro and registro['anexos']:
                 if isinstance(registro['anexos'], str):
@@ -705,19 +693,39 @@ def upload_anexo(registro_id):
                 anexos = []
         except (json.JSONDecodeError, TypeError):
             anexos = []
-        
+
         # Gera um ID único para o anexo
         import uuid
         anexo_id = str(uuid.uuid4())
-        
-        # Adiciona o novo anexo
-        novo_anexo = {
-            'id': anexo_id,
-            'nome_original': filename,
-            'nome_sistema': unique_filename,
-            'data_upload': datetime.now().isoformat(),
-            'tamanho': os.path.getsize(filepath)
-        }
+
+        # Salva o arquivo (S3 em produção, local em desenvolvimento)
+        if IS_PRODUCTION:
+            result = s3.upload_file(file)
+            if not result['success']:
+                return jsonify({'error': 'Erro ao fazer upload do arquivo.'}), 500
+            
+            # Adiciona o novo anexo com informações do S3
+            novo_anexo = {
+                'id': anexo_id,
+                'nome_original': filename,
+                'nome_sistema': result['filename'],
+                'data_upload': datetime.now().isoformat(),
+                'tamanho': file.content_length,
+                's3_path': result['s3_path'],
+                'url': result['url']
+            }
+        else:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(filepath)
+            
+            # Adiciona o novo anexo com informações locais
+            novo_anexo = {
+                'id': anexo_id,
+                'nome_original': filename,
+                'nome_sistema': unique_filename,
+                'data_upload': datetime.now().isoformat(),
+                'tamanho': os.path.getsize(filepath)
+            }
         anexos.append(novo_anexo)
         
         # Atualiza o registro no banco de dados
