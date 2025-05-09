@@ -8,19 +8,17 @@ class S3Handler:
     def __init__(self):
         print("[INFO] Inicializando S3Handler...")
         
-        # Valores padrão do render.yaml
-        default_values = {
-            'AWS_ACCESS_KEY_ID': 'AKIA6K5V7IBO8LCA3AX3',
-            'AWS_SECRET_ACCESS_KEY': 'GuVsYxyGpmIiHDZyX3udbLwEmCnq/mBRaxtPWn7p',
-            'AWS_DEFAULT_REGION': 'us-east-1',
-            'AWS_BUCKET_NAME': 'mybucketmarcussaidrr'
-        }
-        
-        # Usar valores do ambiente ou fallback para valores padrão
-        self.aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID', default_values['AWS_ACCESS_KEY_ID'])
-        self.aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY', default_values['AWS_SECRET_ACCESS_KEY'])
-        self.aws_region = os.environ.get('AWS_DEFAULT_REGION', default_values['AWS_DEFAULT_REGION'])
-        self.bucket_name = os.environ.get('AWS_BUCKET_NAME', default_values['AWS_BUCKET_NAME'])
+        # Obter valores das variáveis de ambiente
+        self.aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+        self.aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+        self.aws_region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+        self.bucket_name = os.environ.get('AWS_BUCKET_NAME')
+
+        # Verificar se as credenciais necessárias estão presentes
+        if not all([self.aws_access_key_id, self.aws_secret_access_key, self.bucket_name]):
+            error_msg = "[ERROR] Credenciais AWS ausentes. Verifique as variáveis de ambiente."
+            print(error_msg)
+            raise Exception(error_msg)
 
         print(f"[INFO] AWS_ACCESS_KEY_ID presente: {bool(self.aws_access_key_id)}")
         print(f"[INFO] AWS_SECRET_ACCESS_KEY presente: {bool(self.aws_secret_access_key)}")
