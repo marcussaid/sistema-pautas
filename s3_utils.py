@@ -9,7 +9,7 @@ class S3Handler:
         print("[INFO] Inicializando S3Handler...")
         
         # Verificar se estamos em produção
-        self.is_production = os.environ.get('RENDER', False)
+        self.is_production = os.environ.get('RENDER', 'false').lower() == 'true'
         
         if self.is_production:
             # Obter valores das variáveis de ambiente

@@ -14,7 +14,7 @@ services:
       sizeGB: 1
     envVars:
       - key: RENDER
-        value: true
+        value: "true"
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
