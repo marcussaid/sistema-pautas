@@ -113,6 +113,11 @@ def query_db(query, args=(), one=False):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # Adapta a query para PostgreSQL se estiver em produção
+        if IS_PRODUCTION:
+            query = query.replace('?', '%s')
+        
         cur.execute(query, args)
         rv = cur.fetchall()
         print(f"[INFO] Query executada com sucesso. Resultados: {len(rv) if rv else 0}")
