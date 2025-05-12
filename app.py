@@ -162,6 +162,68 @@ def import_csv():
     print("[INFO] Acessando rota /import_csv")
     return render_template('import_csv.html')
 
+@app.route('/export_csv')
+@login_required
+def export_csv():
+    print("[INFO] Iniciando exportação para CSV")
+    try:
+        # Busca os registros
+        if IS_PRODUCTION:
+            registros = query_db("""
+                SELECT *,
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros 
+                ORDER BY data DESC
+            """)
+            # Ajusta os campos de data
+            for registro in registros:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        else:
+            registros = query_db('SELECT * FROM registros ORDER BY data DESC')
+        
+        if not registros:
+            flash('Nenhum registro encontrado para exportar.')
+            return redirect(url_for('report'))
+        
+        # Cria o arquivo CSV em memória
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Escreve o cabeçalho
+        writer.writerow(['Data', 'Demanda', 'Assunto', 'Local', 'Direcionamentos', 'Status', 'Último Editor', 'Última Edição'])
+        
+        # Escreve os dados
+        for registro in registros:
+            writer.writerow([
+                registro['data'],
+                registro['demanda'],
+                registro['assunto'],
+                registro['local'],
+                registro['direcionamentos'],
+                registro['status'],
+                registro['ultimo_editor'],
+                registro['data_ultima_edicao'] if registro['data_ultima_edicao'] else ''
+            ])
+        
+        # Prepara a resposta
+        output.seek(0)
+        return Response(
+            output.getvalue().encode('utf-8-sig'),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': 'attachment; filename=registros.csv',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Exception as e:
+        print(f"[ERROR] Erro ao exportar CSV: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao exportar registros. Por favor, tente novamente.')
+        return redirect(url_for('report'))
+
 @app.route('/delete_registro/<int:registro_id>', methods=['POST'])
 @login_required
 def delete_registro(registro_id):
