@@ -124,6 +124,12 @@ def index():
         return redirect(url_for('login'))
     return render_template('report.html')
 
+@app.route('/form')
+@login_required
+def form():
+    print("[INFO] Acessando rota /form")
+    return render_template('form.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     print("[INFO] Acessando rota /register")
