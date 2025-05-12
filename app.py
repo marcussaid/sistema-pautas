@@ -11,6 +11,9 @@ import psycopg2
 from psycopg2.extras import DictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# Constantes
+STATUS_CHOICES = ['Em andamento', 'Concluído', 'Pendente', 'Cancelado']
+
 # Inicialização do Flask
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
@@ -152,6 +155,12 @@ def form():
     print("[INFO] Acessando rota /form")
     today = datetime.now().strftime('%Y-%m-%d')
     return render_template('form.html', today=today, form_data={})
+
+@app.route('/import_csv')
+@login_required
+def import_csv():
+    print("[INFO] Acessando rota /import_csv")
+    return render_template('import_csv.html')
 
 @app.route('/submit', methods=['POST'])
 @login_required
