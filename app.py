@@ -120,9 +120,9 @@ else:
 
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('report'))
-    return redirect(url_for('login'))
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+    return render_template('report.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
