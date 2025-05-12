@@ -159,33 +159,53 @@ def logout():
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     print("[INFO] Acessando rota /forgot_password")
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        print(f"[INFO] Tentativa de recuperação de senha para usuário: {username}")
-        
-        if not username:
-            print("[ERROR] Nome de usuário não fornecido")
-            flash('Por favor, informe o nome de usuário.')
-            return redirect(url_for('forgot_password'))
+    try:
+        if request.method == 'POST':
+            username = request.form.get('username', '').strip()
+            print(f"[INFO] Tentativa de recuperação de senha para usuário: {username}")
             
-        try:
-            user = query_db('SELECT * FROM users WHERE username = ?', [username], one=True)
-            if not user:
-                print(f"[ERROR] Usuário não encontrado: {username}")
-                flash('Usuário não encontrado.')
+            if not username:
+                print("[ERROR] Nome de usuário não fornecido")
+                flash('Por favor, informe o nome de usuário.')
                 return redirect(url_for('forgot_password'))
+            
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
                 
-            # Em um sistema real, aqui seria enviado um e-mail com link de redefinição
-            # Como é uma versão simplificada, apenas resetamos para uma senha padrão
-            query_db('UPDATE users SET password = ? WHERE id = ?', ['123456', user['id']])
-            print(f"[INFO] Senha redefinida com sucesso para usuário: {username}")
-            flash('Senha redefinida para: 123456. Por favor, altere sua senha após o login.')
-            return redirect(url_for('login'))
-        except Exception as e:
-            print(f"[ERROR] Erro ao redefinir senha: {str(e)}")
-            print(f"[ERROR] Traceback: {traceback.format_exc()}")
-            flash('Erro ao processar a recuperação de senha. Por favor, tente novamente.')
-            return redirect(url_for('forgot_password'))
+                # Adapta a query para PostgreSQL se estiver em produção
+                if IS_PRODUCTION:
+                    cur.execute('SELECT * FROM users WHERE username = %s', [username])
+                else:
+                    cur.execute('SELECT * FROM users WHERE username = ?', [username])
+                
+                user = cur.fetchone()
+                
+                if not user:
+                    print(f"[ERROR] Usuário não encontrado: {username}")
+                    flash('Usuário não encontrado.')
+                    return redirect(url_for('forgot_password'))
+                
+                # Em um sistema real, aqui seria enviado um e-mail com link de redefinição
+                # Como é uma versão simplificada, apenas resetamos para uma senha padrão
+                if IS_PRODUCTION:
+                    cur.execute('UPDATE users SET password = %s WHERE id = %s', ['123456', user['id']])
+                else:
+                    cur.execute('UPDATE users SET password = ? WHERE id = ?', ['123456', user['id']])
+                
+                conn.commit()
+                print(f"[INFO] Senha redefinida com sucesso para usuário: {username}")
+                flash('Senha redefinida para: 123456. Por favor, altere sua senha após o login.')
+                return redirect(url_for('login'))
+            finally:
+                cur.close()
+                conn.close()
+                
+    except Exception as e:
+        print(f"[ERROR] Erro ao processar recuperação de senha: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao processar a recuperação de senha. Por favor, tente novamente.')
+        return redirect(url_for('forgot_password'))
             
     return render_template('forgot_password.html')
 
