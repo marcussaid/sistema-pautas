@@ -41,8 +41,6 @@ def unauthorized():
     flash('Por favor, faça login para acessar esta página.')
     return redirect(url_for('login'))
 
-# Status padrão
-STATUS_CHOICES = ['Em andamento', 'Concluído', 'Pendente', 'Cancelado']
 
 # Classe User para o Flask-Login
 class User(UserMixin):
@@ -158,10 +156,94 @@ def form():
     today = datetime.now().strftime('%Y-%m-%d')
     return render_template('form.html', today=today, form_data={})
 
-@app.route('/import_csv')
+@app.route('/import_csv', methods=['GET', 'POST'])
 @login_required
 def import_csv():
     print("[INFO] Acessando rota /import_csv")
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('Nenhum arquivo selecionado')
+            return redirect(request.url)
+            
+        file = request.files['file']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado')
+            return redirect(request.url)
+            
+        if not file.filename.endswith('.csv'):
+            flash('Por favor, selecione um arquivo CSV')
+            return redirect(request.url)
+            
+        try:
+            # Lê o arquivo CSV
+            stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+            csv_input = csv.reader(stream)
+            next(csv_input)  # Pula o cabeçalho
+            
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            registros_importados = 0
+            erros = []
+            
+            for row in csv_input:
+                try:
+                    if len(row) >= 6:  # Verifica se tem todas as colunas necessárias
+                        data, demanda, assunto, local, direcionamentos, status = row[:6]
+                        
+                        # Validações básicas
+                        if not all([data, demanda, status]):
+                            erros.append(f"Linha com dados incompletos: {row}")
+                            continue
+                            
+                        if status not in STATUS_CHOICES:
+                            erros.append(f"Status inválido '{status}' para demanda: {demanda}")
+                            continue
+                            
+                        # Insere no banco
+                        if IS_PRODUCTION:
+                            cur.execute("""
+                                INSERT INTO registros (data, demanda, assunto, local, direcionamentos, status, ultimo_editor)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """, [data, demanda, assunto, local, direcionamentos, status, current_user.username])
+                        else:
+                            cur.execute("""
+                                INSERT INTO registros (data, demanda, assunto, local, direcionamentos, status, ultimo_editor)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, [data, demanda, assunto, local, direcionamentos, status, current_user.username])
+                            
+                        registros_importados += 1
+                    else:
+                        erros.append(f"Linha com número incorreto de colunas: {row}")
+                        
+                except Exception as e:
+                    erros.append(f"Erro ao processar linha {row}: {str(e)}")
+                    continue
+                    
+            conn.commit()
+            
+            # Prepara mensagem de resultado
+            mensagem = f'Importação concluída. {registros_importados} registros importados com sucesso.'
+            if erros:
+                mensagem += f' Ocorreram {len(erros)} erros.'
+                print("[ERROR] Erros durante importação:")
+                for erro in erros:
+                    print(f"- {erro}")
+                    
+            flash(mensagem)
+            return redirect(url_for('report'))
+            
+        except Exception as e:
+            print(f"[ERROR] Erro durante importação: {str(e)}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            flash('Erro ao processar arquivo. Por favor, verifique o formato e tente novamente.')
+            return redirect(request.url)
+        finally:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+                
     return render_template('import_csv.html')
 
 @app.route('/export_csv')
@@ -287,37 +369,109 @@ def delete_registro(registro_id):
         cur.close()
         conn.close()
 
-@app.route('/edit_registro/<int:registro_id>', methods=['GET'])
+@app.route('/edit_registro/<int:registro_id>', methods=['GET', 'POST'])
 @login_required
 def edit_registro(registro_id):
     print(f"[INFO] Acessando edição do registro {registro_id}")
     try:
-        if IS_PRODUCTION:
-            registro = query_db("""
-                SELECT *,
-                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
-                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
-                FROM registros 
-                WHERE id = %s
-            """, [registro_id], one=True)
-            if registro:
-                registro['data'] = registro['data_formatada']
-                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        if request.method == 'POST':
+            data = request.form.get('data')
+            demanda = request.form.get('demanda')
+            assunto = request.form.get('assunto')
+            local = request.form.get('local')
+            direcionamentos = request.form.get('direcionamentos')
+            status = request.form.get('status')
+            
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
+                
+                if IS_PRODUCTION:
+                    cur.execute("""
+                        UPDATE registros 
+                        SET data = %s, demanda = %s, assunto = %s, local = %s, 
+                            direcionamentos = %s, status = %s, 
+                            ultimo_editor = %s, data_ultima_edicao = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    """, [data, demanda, assunto, local, direcionamentos, status, 
+                         current_user.username, registro_id])
+                else:
+                    cur.execute("""
+                        UPDATE registros 
+                        SET data = ?, demanda = ?, assunto = ?, local = ?, 
+                            direcionamentos = ?, status = ?, 
+                            ultimo_editor = ?, data_ultima_edicao = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, [data, demanda, assunto, local, direcionamentos, status, 
+                         current_user.username, registro_id])
+                
+                # Processa os arquivos anexados
+                files = request.files.getlist('files')
+                for file in files:
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        if IS_PRODUCTION:
+                            # Upload para S3
+                            s3_key = f'uploads/{registro_id}/{filename}'
+                            s3.upload_fileobj(file, s3_key)
+                            
+                            # Salva referência no banco
+                            cur.execute("""
+                                INSERT INTO anexos (registro_id, nome_arquivo, s3_key)
+                                VALUES (%s, %s, %s)
+                            """, [registro_id, filename, s3_key])
+                        else:
+                            # Salva localmente
+                            upload_path = os.path.join(app.config['UPLOAD_FOLDER'], str(registro_id))
+                            os.makedirs(upload_path, exist_ok=True)
+                            file.save(os.path.join(upload_path, filename))
+                            
+                            # Salva referência no banco
+                            cur.execute("""
+                                INSERT INTO anexos (registro_id, nome_arquivo, caminho_local)
+                                VALUES (?, ?, ?)
+                            """, [registro_id, filename, os.path.join(str(registro_id), filename)])
+                
+                conn.commit()
+                flash('Registro atualizado com sucesso!')
+                return redirect(url_for('report'))
+                
+            except Exception as e:
+                conn.rollback()
+                print(f"[ERROR] Erro ao atualizar registro: {str(e)}")
+                print(f"[ERROR] Traceback: {traceback.format_exc()}")
+                flash('Erro ao atualizar registro. Por favor, tente novamente.')
+                return redirect(url_for('edit_registro', registro_id=registro_id))
+            finally:
+                cur.close()
+                conn.close()
         else:
-            registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
+            if IS_PRODUCTION:
+                registro = query_db("""
+                    SELECT *,
+                           TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                           TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                    FROM registros 
+                    WHERE id = %s
+                """, [registro_id], one=True)
+                if registro:
+                    registro['data'] = registro['data_formatada']
+                    registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+            else:
+                registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
+                
+            if not registro:
+                flash('Registro não encontrado.')
+                return redirect(url_for('report'))
+                
+            # Busca anexos
+            if IS_PRODUCTION:
+                anexos = query_db('SELECT * FROM anexos WHERE registro_id = %s', [registro_id])
+            else:
+                anexos = query_db('SELECT * FROM anexos WHERE registro_id = ?', [registro_id])
+                
+            return render_template('edit.html', registro=registro, anexos=anexos, status_list=STATUS_CHOICES)
             
-        if not registro:
-            flash('Registro não encontrado.')
-            return redirect(url_for('report'))
-            
-        # Busca anexos
-        if IS_PRODUCTION:
-            anexos = query_db('SELECT * FROM anexos WHERE registro_id = %s', [registro_id])
-        else:
-            anexos = query_db('SELECT * FROM anexos WHERE registro_id = ?', [registro_id])
-            
-        return render_template('edit.html', registro=registro, anexos=anexos, status_list=STATUS_CHOICES)
-        
     except Exception as e:
         print(f"[ERROR] Erro ao carregar registro para edição: {str(e)}")
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
@@ -480,7 +634,7 @@ def login():
                 user_obj = User(user['id'], user['username'], user['is_superuser'])
                 login_user(user_obj)
                 print(f"[INFO] Login realizado com sucesso. ID: {user_obj.id}, is_superuser: {user_obj.is_superuser}")
-                return redirect(url_for('form'))
+                return redirect(url_for('report'))
             else:
                 print(f"[ERROR] Usuário ou senha inválidos para: {username}")
                 flash('Usuário ou senha inválidos.')
