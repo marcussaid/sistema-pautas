@@ -162,6 +162,67 @@ def import_csv():
     print("[INFO] Acessando rota /import_csv")
     return render_template('import_csv.html')
 
+@app.route('/delete_registro/<int:registro_id>', methods=['POST'])
+@login_required
+def delete_registro(registro_id):
+    print(f"[INFO] Tentando excluir registro {registro_id}")
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Primeiro exclui os anexos
+        if IS_PRODUCTION:
+            # Busca os anexos no S3
+            cur.execute('SELECT s3_key FROM anexos WHERE registro_id = %s', [registro_id])
+            anexos = cur.fetchall()
+            
+            # Remove os arquivos do S3
+            for anexo in anexos:
+                if anexo['s3_key']:
+                    try:
+                        s3.delete_file(anexo['s3_key'])
+                    except Exception as e:
+                        print(f"[WARN] Erro ao excluir arquivo do S3: {str(e)}")
+            
+            # Remove os registros de anexos do banco
+            cur.execute('DELETE FROM anexos WHERE registro_id = %s', [registro_id])
+            
+            # Remove o registro principal
+            cur.execute('DELETE FROM registros WHERE id = %s', [registro_id])
+        else:
+            # Em desenvolvimento, remove os arquivos locais
+            cur.execute('SELECT caminho_local FROM anexos WHERE registro_id = ?', [registro_id])
+            anexos = cur.fetchall()
+            
+            # Remove os arquivos locais
+            for anexo in anexos:
+                if anexo['caminho_local']:
+                    try:
+                        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], anexo['caminho_local'])
+                        if os.path.exists(caminho_completo):
+                            os.remove(caminho_completo)
+                    except Exception as e:
+                        print(f"[WARN] Erro ao excluir arquivo local: {str(e)}")
+            
+            # Remove os registros de anexos do banco
+            cur.execute('DELETE FROM anexos WHERE registro_id = ?', [registro_id])
+            
+            # Remove o registro principal
+            cur.execute('DELETE FROM registros WHERE id = ?', [registro_id])
+        
+        conn.commit()
+        print(f"[INFO] Registro {registro_id} excluído com sucesso")
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"[ERROR] Erro ao excluir registro: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': 'Erro ao excluir registro'})
+    finally:
+        cur.close()
+        conn.close()
+
 @app.route('/edit_registro/<int:registro_id>', methods=['GET'])
 @login_required
 def edit_registro(registro_id):
