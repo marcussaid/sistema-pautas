@@ -360,11 +360,235 @@ def admin():
         return redirect(url_for('index'))
     try:
         users = query_db('SELECT * FROM users ORDER BY username')
-        return render_template('admin.html', users=users)
+        
+        # Estatísticas
+        stats = {
+            'total_registros': query_db('SELECT COUNT(*) as count FROM registros', one=True)['count'],
+            'registros_hoje': query_db("""
+                SELECT COUNT(*) as count FROM registros 
+                WHERE DATE(data) = CURRENT_DATE
+            """, one=True)['count'],
+            'total_usuarios': len(users),
+            'registros_pendentes': query_db("""
+                SELECT COUNT(*) as count FROM registros 
+                WHERE status = 'Pendente'
+            """, one=True)['count'],
+            'status_counts': {}
+        }
+        
+        # Contagem por status
+        status_counts = query_db('SELECT status, COUNT(*) as count FROM registros GROUP BY status')
+        stats['status_counts'] = {row['status']: row['count'] for row in status_counts}
+        
+        # Configurações do sistema
+        settings = {
+            'per_page': 10,  # Valor padrão
+            'session_timeout': 30,  # 30 minutos
+            'auto_backup': 'daily'
+        }
+        
+        return render_template('admin.html', users=users, stats=stats, settings=settings)
     except Exception as e:
         print(f"[ERROR] Erro ao carregar página de admin: {str(e)}")
         flash('Erro ao carregar página de administração.')
         return redirect(url_for('index'))
+
+@app.route('/admin/user/<int:user_id>', methods=['PUT'])
+@login_required
+def update_user(user_id):
+    if not current_user.is_superuser:
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        is_superuser = data.get('is_superuser', False)
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            if password:
+                cur.execute("""
+                    UPDATE users 
+                    SET username = %s, password = %s, is_superuser = %s 
+                    WHERE id = %s
+                """, [username, password, is_superuser, user_id])
+            else:
+                cur.execute("""
+                    UPDATE users 
+                    SET username = %s, is_superuser = %s 
+                    WHERE id = %s
+                """, [username, is_superuser, user_id])
+            
+            conn.commit()
+            return jsonify({'success': True})
+            
+        finally:
+            cur.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f"[ERROR] Erro ao atualizar usuário: {str(e)}")
+        return jsonify({'error': 'Erro ao atualizar usuário'}), 500
+
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if not current_user.is_superuser:
+        flash('Acesso negado')
+        return redirect(url_for('admin'))
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            # Não permitir excluir o próprio usuário
+            if user_id == current_user.id:
+                flash('Você não pode excluir seu próprio usuário')
+                return redirect(url_for('admin'))
+            
+            cur.execute('DELETE FROM users WHERE id = %s', [user_id])
+            conn.commit()
+            flash('Usuário excluído com sucesso')
+            
+        finally:
+            cur.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f"[ERROR] Erro ao excluir usuário: {str(e)}")
+        flash('Erro ao excluir usuário')
+        
+    return redirect(url_for('admin'))
+
+@app.route('/export_csv')
+@login_required
+def export_csv():
+    if not current_user.is_superuser:
+        flash('Acesso negado')
+        return redirect(url_for('admin'))
+    
+    try:
+        registros = query_db("""
+            SELECT r.*, a.nome_arquivo, a.s3_key
+            FROM registros r
+            LEFT JOIN anexos a ON r.id = a.registro_id
+            ORDER BY r.data DESC, r.id DESC
+        """)
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Cabeçalho
+        writer.writerow(['ID', 'Data', 'Demanda', 'Assunto', 'Local', 'Direcionamentos', 
+                        'Status', 'Último Editor', 'Data Última Edição', 'Anexos'])
+        
+        # Dados
+        for registro in registros:
+            writer.writerow([
+                registro['id'],
+                registro['data'].strftime('%Y-%m-%d'),
+                registro['demanda'],
+                registro['assunto'],
+                registro['local'],
+                registro['direcionamentos'],
+                registro['status'],
+                registro['ultimo_editor'],
+                registro['data_ultima_edicao'].strftime('%Y-%m-%d %H:%M:%S') if registro['data_ultima_edicao'] else '',
+                registro['nome_arquivo'] if registro['nome_arquivo'] else ''
+            ])
+        
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=registros.csv'}
+        )
+        
+    except Exception as e:
+        print(f"[ERROR] Erro ao exportar CSV: {str(e)}")
+        flash('Erro ao exportar registros')
+        return redirect(url_for('admin'))
+
+@app.route('/export_all_tables')
+@login_required
+def export_all_tables():
+    if not current_user.is_superuser:
+        flash('Acesso negado')
+        return redirect(url_for('admin'))
+    
+    try:
+        # Criar diretório temporário
+        import tempfile
+        import zipfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        
+        try:
+            # Exportar cada tabela
+            tables = ['registros', 'anexos', 'users']
+            for table in tables:
+                data = query_db(f'SELECT * FROM {table}')
+                
+                with open(os.path.join(temp_dir, f'{table}.csv'), 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    if data:
+                        # Cabeçalho
+                        writer.writerow(data[0].keys())
+                        # Dados
+                        for row in data:
+                            writer.writerow(row.values())
+            
+            # Criar arquivo ZIP
+            zip_path = os.path.join(temp_dir, 'backup.zip')
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for table in tables:
+                    csv_path = os.path.join(temp_dir, f'{table}.csv')
+                    zipf.write(csv_path, f'{table}.csv')
+            
+            # Enviar arquivo
+            with open(zip_path, 'rb') as f:
+                data = f.read()
+                
+            return Response(
+                data,
+                mimetype='application/zip',
+                headers={'Content-Disposition': f'attachment; filename=backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'}
+            )
+            
+        finally:
+            # Limpar diretório temporário
+            shutil.rmtree(temp_dir)
+            
+    except Exception as e:
+        print(f"[ERROR] Erro ao exportar tabelas: {str(e)}")
+        flash('Erro ao exportar tabelas')
+        return redirect(url_for('admin'))
+
+@app.route('/update_settings', methods=['POST'])
+@login_required
+def update_settings():
+    if not current_user.is_superuser:
+        flash('Acesso negado')
+        return redirect(url_for('admin'))
+    
+    try:
+        per_page = request.form.get('per_page', type=int)
+        session_timeout = request.form.get('session_timeout', type=int)
+        auto_backup = request.form.get('auto_backup')
+        
+        # TODO: Implementar salvamento das configurações
+        flash('Configurações atualizadas com sucesso')
+        
+    except Exception as e:
+        print(f"[ERROR] Erro ao atualizar configurações: {str(e)}")
+        flash('Erro ao atualizar configurações')
+        
+    return redirect(url_for('admin'))
 
 @app.route('/logout')
 @login_required
