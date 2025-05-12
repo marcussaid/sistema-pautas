@@ -569,6 +569,61 @@ def export_all_tables():
         flash('Erro ao exportar tabelas')
         return redirect(url_for('admin'))
 
+@app.route('/import_csv', methods=['GET', 'POST'])
+@login_required
+def import_csv():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('Nenhum arquivo selecionado')
+            return redirect(url_for('import_csv'))
+        
+        file = request.files['file']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado')
+            return redirect(url_for('import_csv'))
+        
+        if not file.filename.endswith('.csv'):
+            flash('Por favor, selecione um arquivo CSV')
+            return redirect(url_for('import_csv'))
+        
+        try:
+            # Ler o arquivo CSV
+            stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+            csv_reader = csv.DictReader(stream)
+            
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            try:
+                for row in csv_reader:
+                    cur.execute("""
+                        INSERT INTO registros (data, demanda, assunto, local, direcionamentos, status, ultimo_editor)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, [
+                        row.get('Data', ''),
+                        row.get('Demanda', ''),
+                        row.get('Assunto', ''),
+                        row.get('Local', ''),
+                        row.get('Direcionamentos', ''),
+                        row.get('Status', 'Pendente'),
+                        current_user.username
+                    ])
+                
+                conn.commit()
+                flash('Registros importados com sucesso!')
+                return redirect(url_for('report'))
+                
+            finally:
+                cur.close()
+                conn.close()
+                
+        except Exception as e:
+            print(f"[ERROR] Erro ao importar CSV: {str(e)}")
+            flash('Erro ao importar registros. Verifique o formato do arquivo.')
+            return redirect(url_for('import_csv'))
+    
+    return render_template('import_csv.html')
+
 @app.route('/update_settings', methods=['POST'])
 @login_required
 def update_settings():
