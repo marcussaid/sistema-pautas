@@ -6,7 +6,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
-from s3_utils_new import S3Handler
+from s3_utils import S3Handler  # Import correto
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -279,6 +279,58 @@ def edit_registro(registro_id):
         print(f"[ERROR] Erro ao processar edição: {str(e)}")
         flash('Erro ao processar edição. Por favor, tente novamente.')
         return redirect(url_for('report'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        try:
+            user = query_db('SELECT * FROM users WHERE username = %s AND password = %s',
+                          [username, password], one=True)
+            if user:
+                user_obj = User(user['id'], user['username'], user['is_superuser'])
+                login_user(user_obj)
+                return redirect(url_for('report'))
+            else:
+                flash('Usuário ou senha inválidos.')
+        except Exception as e:
+            print(f"[ERROR] Erro durante o login: {str(e)}")
+            flash('Erro ao realizar login. Por favor, tente novamente.')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/form')
+@login_required
+def form():
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('form.html', today=today, form_data={})
+
+@app.route('/report')
+@login_required
+def report():
+    try:
+        registros = query_db("""
+            SELECT *, 
+                   TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                   TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+            FROM registros
+            ORDER BY data DESC, id DESC
+        """)
+        for registro in registros:
+            registro['data'] = registro['data_formatada']
+            registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        return render_template('report.html', registros=registros, status_list=STATUS_CHOICES)
+    except Exception as e:
+        print(f"[ERROR] Erro ao carregar relatório: {str(e)}")
+        flash('Erro ao carregar o relatório. Por favor, tente novamente.')
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=False)
