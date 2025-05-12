@@ -128,7 +128,87 @@ def index():
 @login_required
 def form():
     print("[INFO] Acessando rota /form")
-    return render_template('form.html')
+    today = datetime.now().strftime('%Y-%m-%d')
+    return render_template('form.html', today=today, form_data={})
+
+@app.route('/submit', methods=['POST'])
+@login_required
+def submit():
+    print("[INFO] Processando submissão de formulário")
+    try:
+        data = request.form.get('data')
+        demanda = request.form.get('demanda')
+        assunto = request.form.get('assunto')
+        local = request.form.get('local')
+        direcionamentos = request.form.get('direcionamentos')
+        status = request.form.get('status')
+        
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            
+            if IS_PRODUCTION:
+                cur.execute("""
+                    INSERT INTO registros (data, demanda, assunto, local, direcionamentos, status, ultimo_editor)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, [data, demanda, assunto, local, direcionamentos, status, current_user.username])
+            else:
+                cur.execute("""
+                    INSERT INTO registros (data, demanda, assunto, local, direcionamentos, status, ultimo_editor)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+                """, [data, demanda, assunto, local, direcionamentos, status, current_user.username])
+            
+            registro_id = cur.fetchone()[0]
+            
+            # Processa os arquivos anexados
+            files = request.files.getlist('files')
+            for file in files:
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    if IS_PRODUCTION:
+                        # Upload para S3
+                        s3_key = f'uploads/{registro_id}/{filename}'
+                        s3.upload_fileobj(file, s3_key)
+                        
+                        # Salva referência no banco
+                        cur.execute("""
+                            INSERT INTO anexos (registro_id, nome_arquivo, s3_key)
+                            VALUES (%s, %s, %s)
+                        """, [registro_id, filename, s3_key])
+                    else:
+                        # Salva localmente
+                        upload_path = os.path.join(app.config['UPLOAD_FOLDER'], str(registro_id))
+                        os.makedirs(upload_path, exist_ok=True)
+                        file.save(os.path.join(upload_path, filename))
+                        
+                        # Salva referência no banco
+                        cur.execute("""
+                            INSERT INTO anexos (registro_id, nome_arquivo, caminho_local)
+                            VALUES (?, ?, ?)
+                        """, [registro_id, filename, os.path.join(str(registro_id), filename)])
+            
+            conn.commit()
+            print(f"[INFO] Registro criado com sucesso. ID: {registro_id}")
+            flash('Registro criado com sucesso!')
+            return redirect(url_for('report'))
+            
+        except Exception as e:
+            conn.rollback()
+            print(f"[ERROR] Erro ao criar registro: {str(e)}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            flash('Erro ao criar registro. Por favor, tente novamente.')
+            return render_template('form.html', form_data=request.form, today=datetime.now().strftime('%Y-%m-%d'))
+        finally:
+            cur.close()
+            conn.close()
+            
+    except Exception as e:
+        print(f"[ERROR] Erro ao processar formulário: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao processar formulário. Por favor, tente novamente.')
+        return render_template('form.html', form_data=request.form, today=datetime.now().strftime('%Y-%m-%d'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
