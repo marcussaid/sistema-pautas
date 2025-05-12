@@ -121,8 +121,69 @@ else:
 @app.route('/')
 def index():
     if current_user.is_authenticated:
-        return redirect(url_for('form'))
+        return redirect(url_for('report'))
     return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    print("[INFO] Acessando rota /register")
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        
+        print(f"[INFO] Tentativa de registro para usuário: {username}")
+        
+        if not all([username, password, confirm_password]):
+            print("[ERROR] Campos obrigatórios não preenchidos")
+            flash('Por favor, preencha todos os campos.')
+            return redirect(url_for('register'))
+            
+        if password != confirm_password:
+            print("[ERROR] Senhas não coincidem")
+            flash('As senhas não coincidem.')
+            return redirect(url_for('register'))
+            
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            # Verifica se o usuário já existe
+            if IS_PRODUCTION:
+                cur.execute('SELECT * FROM users WHERE username = %s', [username])
+            else:
+                cur.execute('SELECT * FROM users WHERE username = ?', [username])
+                
+            existing_user = cur.fetchone()
+            
+            if existing_user:
+                print(f"[ERROR] Usuário já existe: {username}")
+                flash('Nome de usuário já existe.')
+                return redirect(url_for('register'))
+                
+            # Insere o novo usuário
+            if IS_PRODUCTION:
+                cur.execute('INSERT INTO users (username, password, is_superuser) VALUES (%s, %s, %s)',
+                          [username, password, False])
+            else:
+                cur.execute('INSERT INTO users (username, password, is_superuser) VALUES (?, ?, ?)',
+                          [username, password, False])
+                
+            conn.commit()
+            print(f"[INFO] Usuário criado com sucesso: {username}")
+            flash('Usuário criado com sucesso!')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            print(f"[ERROR] Erro ao criar usuário: {str(e)}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            flash('Erro ao criar usuário. Por favor, tente novamente.')
+            return redirect(url_for('register'))
+        finally:
+            cur.close()
+            conn.close()
+            
+    return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
