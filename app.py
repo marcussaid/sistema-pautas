@@ -162,6 +162,43 @@ def import_csv():
     print("[INFO] Acessando rota /import_csv")
     return render_template('import_csv.html')
 
+@app.route('/edit_registro/<int:registro_id>', methods=['GET'])
+@login_required
+def edit_registro(registro_id):
+    print(f"[INFO] Acessando edição do registro {registro_id}")
+    try:
+        if IS_PRODUCTION:
+            registro = query_db("""
+                SELECT *,
+                       TO_CHAR(data, 'YYYY-MM-DD') as data_formatada,
+                       TO_CHAR(data_ultima_edicao, 'YYYY-MM-DD HH24:MI:SS') as data_edicao_formatada
+                FROM registros 
+                WHERE id = %s
+            """, [registro_id], one=True)
+            if registro:
+                registro['data'] = registro['data_formatada']
+                registro['data_ultima_edicao'] = registro['data_edicao_formatada']
+        else:
+            registro = query_db('SELECT * FROM registros WHERE id = ?', [registro_id], one=True)
+            
+        if not registro:
+            flash('Registro não encontrado.')
+            return redirect(url_for('report'))
+            
+        # Busca anexos
+        if IS_PRODUCTION:
+            anexos = query_db('SELECT * FROM anexos WHERE registro_id = %s', [registro_id])
+        else:
+            anexos = query_db('SELECT * FROM anexos WHERE registro_id = ?', [registro_id])
+            
+        return render_template('edit.html', registro=registro, anexos=anexos, status_list=STATUS_CHOICES)
+        
+    except Exception as e:
+        print(f"[ERROR] Erro ao carregar registro para edição: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        flash('Erro ao carregar registro para edição. Por favor, tente novamente.')
+        return redirect(url_for('report'))
+
 @app.route('/submit', methods=['POST'])
 @login_required
 def submit():
