@@ -300,6 +300,23 @@ def login():
             flash('Erro ao realizar login. Por favor, tente novamente.')
     return render_template('login.html')
 
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        try:
+            user = query_db('SELECT * FROM users WHERE username = %s', [username], one=True)
+            if user:
+                # TODO: Implementar lógica de recuperação de senha
+                flash('Instruções para redefinir sua senha foram enviadas.')
+            else:
+                flash('Se o usuário existir em nossa base, você receberá instruções para redefinir sua senha.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"[ERROR] Erro ao processar recuperação de senha: {str(e)}")
+            flash('Erro ao processar solicitação. Por favor, tente novamente.')
+    return render_template('forgot_password.html')
+
 @app.route('/logout')
 @login_required
 def logout():
