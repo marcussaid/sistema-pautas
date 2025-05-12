@@ -317,6 +317,55 @@ def forgot_password():
             flash('Erro ao processar solicitação. Por favor, tente novamente.')
     return render_template('forgot_password.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        try:
+            # Verificar se usuário já existe
+            existing_user = query_db('SELECT * FROM users WHERE username = %s', [username], one=True)
+            if existing_user:
+                flash('Nome de usuário já existe.')
+                return redirect(url_for('register'))
+            
+            # Criar novo usuário
+            conn = get_db_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    'INSERT INTO users (username, password, is_superuser) VALUES (%s, %s, %s)',
+                    [username, password, False]
+                )
+                conn.commit()
+                flash('Conta criada com sucesso! Faça login para continuar.')
+                return redirect(url_for('login'))
+            finally:
+                cur.close()
+                conn.close()
+                
+        except Exception as e:
+            print(f"[ERROR] Erro ao criar usuário: {str(e)}")
+            flash('Erro ao criar conta. Por favor, tente novamente.')
+            return redirect(url_for('register'))
+            
+    return render_template('register.html')
+
+@app.route('/admin')
+@login_required
+def admin():
+    if not current_user.is_superuser:
+        flash('Acesso negado. Você não tem permissão para acessar esta página.')
+        return redirect(url_for('index'))
+    try:
+        users = query_db('SELECT * FROM users ORDER BY username')
+        return render_template('admin.html', users=users)
+    except Exception as e:
+        print(f"[ERROR] Erro ao carregar página de admin: {str(e)}")
+        flash('Erro ao carregar página de administração.')
+        return redirect(url_for('index'))
+
 @app.route('/logout')
 @login_required
 def logout():
