@@ -3,12 +3,13 @@ import traceback
 import os
 import json
 from werkzeug.utils import secure_filename
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from s3_utils import S3Handler
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import sqlite3
 import psycopg2
 from psycopg2.extras import DictCursor
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Inicialização do Flask
 app = Flask(__name__, static_folder='static', static_url_path='/static')
