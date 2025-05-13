@@ -22,6 +22,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024'
 
 def init_db():
     """Inicializa o banco de dados com tabelas e usuário admin"""
+    conn = None
+    cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -82,10 +84,14 @@ def init_db():
     except Exception as e:
         print(f"[ERROR] Erro ao inicializar banco de dados: {str(e)}")
         print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        if conn:
+            conn.rollback()
         raise
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Inicializar banco de dados
 init_db()
