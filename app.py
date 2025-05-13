@@ -102,3 +102,7 @@ init_db()
 
 # O restante do código do app.py deve ser copiado aqui para manter a funcionalidade completa.
 # Para evitar repetição, este arquivo serve para corrigir o problema da função get_db_connection não definida.
+
+@app.route('/')
+def home():
+    return "Servidor Flask está rodando corretamente."
