@@ -4,6 +4,7 @@ import os
 import json
 import io
 import csv
+import traceback
 from werkzeug.utils import secure_filename
 from datetime import datetime, date, timedelta
 from s3_utils import S3Handler  # Import correto
@@ -18,6 +19,76 @@ STATUS_CHOICES = ['Em andamento', 'Concluído', 'Pendente', 'Cancelado']
 # Inicialização do Flask
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
+
+def init_db():
+    """Inicializa o banco de dados com tabelas e usuário admin"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Criar tabela de usuários se não existir
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                is_superuser BOOLEAN DEFAULT FALSE
+            )
+        """)
+        
+        # Criar tabela de registros se não existir
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registros (
+                id SERIAL PRIMARY KEY,
+                data DATE NOT NULL,
+                demanda TEXT NOT NULL,
+                assunto TEXT,
+                local TEXT,
+                direcionamentos TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'Pendente',
+                ultimo_editor VARCHAR(255),
+                data_ultima_edicao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ultimo_editor) REFERENCES users(username)
+            )
+        """)
+        
+        # Criar tabela de anexos se não existir
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS anexos (
+                id SERIAL PRIMARY KEY,
+                registro_id INTEGER NOT NULL,
+                nome_arquivo VARCHAR(255) NOT NULL,
+                s3_key VARCHAR(255),
+                data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (registro_id) REFERENCES registros(id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Verificar se existe algum usuário admin
+        cur.execute("SELECT COUNT(*) FROM users WHERE is_superuser = true")
+        admin_count = cur.fetchone()[0]
+        
+        if admin_count == 0:
+            # Criar usuário admin padrão
+            cur.execute("""
+                INSERT INTO users (username, password, is_superuser)
+                VALUES (%s, %s, %s)
+            """, ['admin', 'admin123', True])
+            print("[INFO] Usuário admin criado com sucesso")
+        
+        conn.commit()
+        print("[INFO] Banco de dados inicializado com sucesso")
+        
+    except Exception as e:
+        print(f"[ERROR] Erro ao inicializar banco de dados: {str(e)}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+# Inicializar banco de dados
+init_db()
 
 # Verificar ambiente de produção
 IS_PRODUCTION = os.environ.get('RENDER', 'false').lower() == 'true'
@@ -287,16 +358,25 @@ def login():
         password = request.form['password']
         
         try:
-            user = query_db('SELECT * FROM users WHERE username = %s AND password = %s',
-                          [username, password], one=True)
+            # Primeiro, verificar se o usuário existe
+            user = query_db('SELECT * FROM users WHERE username = %s', [username], one=True)
             if user:
-                user_obj = User(user['id'], user['username'], user['is_superuser'])
-                login_user(user_obj)
-                return redirect(url_for('report'))
+                print(f"[INFO] Usuário encontrado: {username}")
+                # Se o usuário existe, verificar a senha
+                if user['password'] == password:  # Em produção, usar hash da senha
+                    user_obj = User(user['id'], user['username'], user['is_superuser'])
+                    login_user(user_obj)
+                    print(f"[INFO] Login bem-sucedido para: {username}")
+                    return redirect(url_for('report'))
+                else:
+                    print(f"[INFO] Senha incorreta para usuário: {username}")
+                    flash('Usuário ou senha inválidos.')
             else:
+                print(f"[INFO] Usuário não encontrado: {username}")
                 flash('Usuário ou senha inválidos.')
         except Exception as e:
             print(f"[ERROR] Erro durante o login: {str(e)}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
             flash('Erro ao realizar login. Por favor, tente novamente.')
     return render_template('login.html')
 
