@@ -26,6 +26,33 @@ def get_db_connection():
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'sistema_demandas_secret_key_2024')
 
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def __init__(self, id, username, password, is_superuser):
+        self.id = id
+        self.username = username
+        self.password = password
+        self.is_superuser = is_superuser
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, password, is_superuser FROM users WHERE id = %s", (user_id,))
+    user_data = cur.fetchone()
+    cur.close()
+    conn.close()
+    if user_data:
+        return User(*user_data)
+    return None
+
+@app.context_processor
+def inject_user():
+    return dict(current_user=current_user)
+
 def init_db():
     """Inicializa o banco de dados com tabelas e usuário admin"""
     conn = None
