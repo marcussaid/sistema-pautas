@@ -131,7 +131,7 @@ init_db()
 
 @app.route('/')
 def home():
-    return render_template('base.html')
+    return render_template('home.html')
 
 # Implementação das rotas para as páginas do sistema
 
