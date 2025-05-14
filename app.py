@@ -11,6 +11,8 @@ from s3_utils import S3Handler  # Import correto
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify, send_from_directory, send_file, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 
+print("Starting Flask app - version 2024-06-01")  # Unique log to confirm deployed version
+
 # Função para conexão com banco de dados
 def get_db_connection():
     DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -100,12 +102,9 @@ def init_db():
 # Inicializar banco de dados
 init_db()
 
-# O restante do código do app.py deve ser copiado aqui para manter a funcionalidade completa.
-# Para evitar repetição, este arquivo serve para corrigir o problema da função get_db_connection não definida.
-
 @app.route('/')
 def home():
-    return "Servidor Flask está rodando corretamente."
+    return render_template('base.html')
 
 # Implementação das rotas para as páginas do sistema
 
