@@ -106,3 +106,52 @@ init_db()
 @app.route('/')
 def home():
     return "Servidor Flask está rodando corretamente."
+
+# Implementação das rotas para as páginas do sistema
+
+@app.route('/admin')
+@login_required
+def admin():
+    return render_template('admin.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        # Lógica de autenticação aqui
+        return redirect(url_for('home'))
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        # Lógica de registro aqui
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/report')
+@login_required
+def report():
+    return render_template('report.html')
+
+@app.route('/import_csv', methods=['GET', 'POST'])
+@login_required
+def import_csv():
+    if request.method == 'POST':
+        # Lógica para importar CSV
+        return redirect(url_for('report'))
+    return render_template('import_csv.html')
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        # Lógica para recuperação de senha
+        return redirect(url_for('login'))
+    return render_template('forgot_password.html')
+
+# Adicione outras rotas conforme necessário para as páginas restantes
