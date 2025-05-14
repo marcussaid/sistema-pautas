@@ -39,11 +39,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: sistema_pautas_db
-          property: connectionString
+        value: "postgres://koyeb-adm:npg_lpzbkM8m1CKR@ep-raspy-recipe-a2ufx9pg.eu-central-1.pg.koyeb.app/koyebdb"
 
-databases:
-  - name: sistema_pautas_db
-    databaseName: sistema_pautas
-    user: sistema_pautas_user
+# Removed Render database service configuration for migration to Koyeb
+# databases:
+#   - name: sistema_pautas_db
+#     databaseName: sistema_pautas
+#     user: sistema_pautas_user
