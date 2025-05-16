@@ -129,6 +129,15 @@ def init_db():
 # Inicializar banco de dados
 init_db()
 
+# Tratamento global de erros para logar exceções detalhadas
+import logging
+from flask import got_request_exception
+
+def log_exception(sender, exception, **extra):
+    sender.logger.error(f"Exception: {exception}", exc_info=exception)
+
+got_request_exception.connect(log_exception, app)
+
 @app.route('/')
 def home():
     return render_template('base.html')
